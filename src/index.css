@@ -1,0 +1,321 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  --font-mono: "Fira Code", monospace;
+}
+
+/* -----------------------------------------------------
+   Chai Charcha Premium Moderate Dark & Catchy Theme
+----------------------------------------------------- */
+
+:root, .theme-dark {
+  /* Ultra-Premium Moderate Dark Color Tokens */
+  --bg-deep: #0a0c10;          /* Deep rich background */
+  --bg-panel: #11141e;         /* Premium structural columns & panels */
+  --bg-card: #151a26;          /* Standard card background */
+  --bg-card-hover: #1c2334;    /* Subtle highlight on hover */
+  --border-subtle: #242c3f;    /* Elegant borders */
+  --border-glow: #313d5a;      /* Focused/active glowing borders */
+  --text-active: #f8fafc;      /* Crisp high-contrast readable headers */
+  --text-muted: #8e9cb2;       /* Secondary grey subtexts */
+  --bg-input: #0c0e14;         /* Inputs background block */
+  
+  /* Catchy Accent Neon Tones */
+  --accent-mint: #10b981;      /* Glow emerald */
+  --accent-gold: #fbbf24;      /* Tea amber gold */
+  --accent-indigo: #6366f1;    /* Premium operations violet */
+  --accent-rose: #f43f5e;      /* Alarm/Warning red */
+}
+
+.theme-light {
+  /* Premium Milk Light Theme */
+  --bg-deep: #f5f7fb;          /* Soft light slate background */
+  --bg-panel: #eef2f6;         /* Soft secondary structure panels */
+  --bg-card: #ffffff;          /* Pure white card backgrounds */
+  --bg-card-hover: #f1f5f9;    /* Clean light blue-grey hover link */
+  --border-subtle: #cbd5e1;    /* Refined grey borders */
+  --border-glow: #818cf8;      /* active glows */
+  --text-active: #0f172a;      /* Deep rich readable slate text */
+  --text-muted: #475569;       /* Slate sub-labels & descriptions */
+  --bg-input: #f8fafc;         /* Inputs background block */
+  
+  --accent-mint: #059669;      /* Darker richer emerald */
+  --accent-gold: #d97706;      /* Rich premium honey gold */
+  --accent-indigo: #4f46e5;    /* Operation indigo */
+  --accent-rose: #dc2626;      /* Red warning */
+}
+
+.theme-amber {
+  /* Warm Amber Golden Chai Theme */
+  --bg-deep: #160f0b;          /* Dark rich earthy roasted tea bean */
+  --bg-panel: #201712;         /* Roasted brown panels */
+  --bg-card: #281d17;          /* Premium wood grain deep cards */
+  --bg-card-hover: #33261f;    /* Light chocolate highlight */
+  --border-subtle: #3f2f26;    /* Dark cinnamon lines */
+  --border-glow: #e07a34;      /* Active glowing copper */
+  --text-active: #fef3c7;      /* Warm delicious milk chai white */
+  --text-muted: #caa690;       /* Fine grounding spice dust beige */
+  --bg-input: #1b130e;         /* Inputs background block */
+  
+  --accent-mint: #10b981;      /* Bright leaf mint */
+  --accent-gold: #f59e0b;      /* Tea honey gold */
+  --accent-indigo: #fb7185;    /* Rose petal infusion color */
+  --accent-rose: #f43f5e;      /* Alarms */
+}
+
+/* Base Body Override */
+body, html {
+  background-color: var(--bg-deep) !important;
+  color: var(--text-active) !important;
+  -webkit-font-smoothing: antialiased;
+  font-family: var(--font-sans);
+}
+
+.min-h-screen {
+  background-color: var(--bg-deep) !important;
+}
+
+/* Structurals (Header, Nav, Sidebar) */
+header, 
+aside, 
+nav,
+.bg-white {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+/* Secondary Panels & Dividers */
+.bg-slate-50,
+.bg-slate-50\/50,
+.bg-slate-100,
+.bg-slate-100\/80,
+.bg-slate-200,
+.bg-gray-50,
+.bg-gray-50\/50,
+.bg-slate-50\/80 {
+  background-color: var(--bg-panel) !important;
+}
+
+/* Cards & Grid list blocks */
+[class*="bg-white"], 
+.bg-white {
+  background-color: var(--bg-card) !important;
+  color: var(--text-active) !important;
+}
+
+/* Table styling for dark theme alignment */
+tr.hover\:bg-slate-50:hover,
+.hover\:bg-slate-55:hover,
+.hover\:bg-slate-50:hover {
+  background-color: var(--bg-card-hover) !important;
+}
+
+.bg-slate-50 {
+  background-color: var(--bg-panel) !important;
+}
+
+thead tr {
+  background-color: var(--bg-deep) !important;
+  border-bottom: 2px solid var(--border-subtle) !important;
+}
+
+/* Catchy Interactive elements */
+button:not(.bg-rose-600):not(.bg-rose-500):not(.bg-emerald-600):not(.bg-emerald-700):not(.bg-amber-500):not(.bg-teal-600):not(.bg-teal-700):not(.bg-indigo-600):not(.bg-indigo-700) {
+  /* General button state overrides for dark consistency */
+}
+
+/* Hover and border overrides */
+.border,
+.border-slate-100,
+.border-slate-150,
+.border-slate-200,
+.border-gray-100,
+.border-gray-150,
+.border-gray-150\/60,
+.border-gray-200,
+.border-dashed {
+  border-color: var(--border-subtle) !important;
+}
+
+/* Typography elements */
+.text-slate-950,
+.text-slate-900,
+.text-gray-900,
+.text-slate-800,
+.text-gray-800,
+.text-slate-700,
+.text-gray-700,
+.text-slate-850,
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-active) !important;
+}
+
+/* Muted subtitles & counters */
+.text-gray-400,
+.text-slate-400,
+.text-gray-500,
+.text-slate-500,
+.text-gray-600,
+.text-slate-650 {
+  color: var(--text-muted) !important;
+}
+
+/* Inputs & Forms (Extremely polished dark mode) */
+input, 
+select, 
+textarea {
+  background-color: var(--bg-input) !important;
+  color: var(--text-active) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: 12px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+input:focus, 
+select:focus, 
+textarea:focus {
+  border-color: var(--accent-mint) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25) !important;
+}
+
+/* Specific Badge and Pills Highlight (Extra catchy!) */
+.bg-teal-50,
+.bg-emerald-50,
+.bg-emerald-55,
+.bg-emerald-100,
+.bg-teal-100 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  color: #34d399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+}
+
+.text-teal-800,
+.text-emerald-700,
+.text-emerald-800,
+.text-emerald-805,
+.text-teal-850 {
+  color: #34d399 !important;
+}
+
+.bg-indigo-50,
+.bg-indigo-100 {
+  background-color: rgba(99, 102, 241, 0.12) !important;
+  color: #818cf8 !important;
+  border: 1px solid rgba(99, 102, 241, 0.2) !important;
+}
+
+.text-indigo-800,
+.text-indigo-900 {
+  color: #818cf8 !important;
+}
+
+.bg-amber-50,
+.bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.2) !important;
+}
+
+.text-amber-800 {
+  color: #fbbf24 !important;
+}
+
+/* POS and Charts visual tune-ups */
+/* Dark SVG Charts text alignment */
+svg text {
+  fill: var(--text-muted) !important;
+  font-weight: 500 !important;
+}
+
+/* Glowing effects for active checkout button and special actions */
+.bg-emerald-600 {
+  background-color: #059669 !important;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2) !important;
+}
+.bg-emerald-600:hover {
+  background-color: #047857 !important;
+}
+
+.bg-indigo-650,
+.bg-indigo-600 {
+  background-color: #4f46e5 !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2) !important;
+}
+.bg-indigo-650:hover,
+.bg-indigo-600:hover {
+  background-color: #4338ca !important;
+}
+
+/* Modals Backdrop & content */
+.bg-black\/60 {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+}
+::-webkit-scrollbar-thumb {
+  background: #242c3f;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #313d5a;
+}
+
+/* =====================================================
+   Sidebar & Navigation Premium Theming Overrides
+   ===================================================== */
+aside button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Active Workspace Nav Buttons */
+aside button.bg-slate-900,
+.mobile-drawer-button-active {
+  background-color: var(--bg-card-hover) !important;
+  color: var(--text-active) !important;
+  border: 1px solid var(--border-glow) !important;
+  font-weight: 800 !important;
+}
+
+/* Active Sidebar Icon Mint/Gold/Indigo highlight tint */
+aside button.bg-slate-900 svg,
+aside button.bg-slate-900 span.text-emerald-400 svg {
+  color: var(--accent-mint) !important;
+}
+
+/* Inactive Sidebar Buttons */
+aside button.text-gray-600 {
+  color: var(--text-muted) !important;
+  background-color: transparent !important;
+}
+
+/* Inactive Sidebar Icons reset */
+aside button.text-gray-600 svg {
+  color: var(--text-muted) !important;
+}
+
+/* Hover/Focus states on inactive components */
+aside button.text-gray-600:hover {
+  background-color: var(--bg-card-hover) !important;
+  color: var(--text-active) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+aside button.text-gray-600:hover svg {
+  color: var(--text-active) !important;
+}

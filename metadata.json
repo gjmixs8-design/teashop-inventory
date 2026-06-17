@@ -1,0 +1,6 @@
+{
+  "name": "Tea Shop Billing & Inventory",
+  "description": "A highly responsive, mobile-optimized Billing, Inventory, Expense, Employee Payroll, and Analytics system designed for modern tea shops and cafes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
