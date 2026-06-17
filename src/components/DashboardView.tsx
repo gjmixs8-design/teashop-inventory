@@ -37,8 +37,11 @@ export default function DashboardView({ setActiveTab }: { setActiveTab: (tab: st
     session,
   } = useApp();
 
-  // Helper date parsing (Local time boundary for June 10, 2026)
-  const todayStr = "2026-06-10";
+  // Helper date parsing (Local time boundary)
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('en-CA');
+  const currentMonthPrefix = todayStr.substring(0, 7) + "-";
+  const currentYearPrefix = todayStr.substring(0, 4) + "-";
 
   // Calculate Metrics
   const metrics = useMemo(() => {
@@ -48,13 +51,13 @@ export default function DashboardView({ setActiveTab }: { setActiveTab: (tab: st
     const todayOrdersCount = todayInvoices.length;
     const todayProfit = todayInvoices.reduce((sum, inv) => sum + inv.profit, 0);
 
-    // 2. Month's Sales (June 2026)
-    const monthInvoices = invoices.filter((inv) => inv.date.includes("2026-06-"));
+    // 2. Month's Sales
+    const monthInvoices = invoices.filter((inv) => inv.date.includes(currentMonthPrefix));
     const monthSales = monthInvoices.reduce((sum, inv) => sum + inv.total, 0);
     const monthProfit = monthInvoices.reduce((sum, inv) => sum + inv.profit, 0);
 
-    // 3. Yearly Sales (2026)
-    const yearInvoices = invoices.filter((inv) => inv.date.includes("2026-"));
+    // 3. Yearly Sales
+    const yearInvoices = invoices.filter((inv) => inv.date.includes(currentYearPrefix));
     const yearSales = yearInvoices.reduce((sum, inv) => sum + inv.total, 0);
 
     // 4. Low stock count
@@ -74,9 +77,9 @@ export default function DashboardView({ setActiveTab }: { setActiveTab: (tab: st
     const materialsValue = rawMaterials.reduce((sum, m) => sum + m.stock * m.purchasePrice, 0);
     const totalInventoryValue = productsValue + materialsValue;
 
-    // 8. Monthly Expenses (June 2026)
+    // 8. Monthly Expenses
     const monthExpenses = expenses
-      .filter((exp) => exp.date.includes("2026-06-"))
+      .filter((exp) => exp.date.includes(currentMonthPrefix))
       .reduce((sum, exp) => sum + exp.amount, 0);
 
     return {
@@ -93,27 +96,28 @@ export default function DashboardView({ setActiveTab }: { setActiveTab: (tab: st
       totalInventoryValue,
       monthExpenses,
     };
-  }, [invoices, products, rawMaterials, employees, attendance, expenses]);
+  }, [invoices, products, rawMaterials, employees, attendance, expenses, todayStr, currentMonthPrefix, currentYearPrefix]);
 
-  // Chart calculation: last 7 days sales (June 4 to June 10, 2026)
+  // Chart calculation: last 7 days sales dynamically
   const chartData = useMemo(() => {
-    const days = [
-      { name: "Thu (Jun 4)", date: "2026-06-04", total: 0 },
-      { name: "Fri (Jun 5)", date: "2026-06-05", total: 0 },
-      { name: "Sat (Jun 6)", date: "2026-06-06", total: 0 },
-      { name: "Sun (Jun 7)", date: "2026-06-07", total: 0 },
-      { name: "Mon (Jun 8)", date: "2026-06-08", total: 800 }, // Pre-filled base
-      { name: "Tue (Jun 9)", date: "2026-06-09", total: 969 }, // Summed of prefilled
-      { name: "Wed (Jun 10)", date: "2026-06-10", total: 595 }, // Today's summed
-    ];
+    const daysList = [];
+    const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-    // Recalculate accurately from real invoices in state
-    return days.map((day) => {
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toLocaleDateString('en-CA');
+      const name = `${weekdays[d.getDay()]} (${months[d.getMonth()]} ${d.getDate()})`;
+      daysList.push({ name, date: dateStr, total: 0 });
+    }
+
+    return daysList.map((day) => {
       const matchInvoices = invoices.filter((inv) => inv.date.startsWith(day.date));
       const totalAmount = matchInvoices.reduce((sum, inv) => sum + inv.total, 0);
       return {
         ...day,
-        total: totalAmount || (day.date === "2026-06-08" ? 770 : day.date === "2026-06-09" ? 969 : 0),
+        total: totalAmount,
       };
     });
   }, [invoices]);

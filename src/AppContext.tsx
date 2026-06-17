@@ -377,7 +377,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Attendance Actions
   const markAttendance = (empId: string, status: Attendance["status"], checkIn?: string, checkOut?: string) => {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
     const key = `${empId}_${todayStr}`;
     const existing = attendance.find((a) => a.id === key);
 

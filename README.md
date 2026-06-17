@@ -26,22 +26,8 @@ Run this command in the project root folder:
 npm install
 ```
 
-### 2. Configure Environment Variables
-Copy the `.env.example` file to `.env`:
-```bash
-cp .env.example .env
-```
-Fill in your Firebase credentials in the `.env` file:
-```env
-VITE_FIREBASE_API_KEY="YOUR_API_KEY"
-VITE_FIREBASE_AUTH_DOMAIN="YOUR_AUTH_DOMAIN"
-VITE_FIREBASE_PROJECT_ID="YOUR_PROJECT_ID"
-VITE_FIREBASE_STORAGE_BUCKET="YOUR_STORAGE_BUCKET"
-VITE_FIREBASE_MESSAGING_SENDER_ID="YOUR_MESSAGING_SENDER_ID"
-VITE_FIREBASE_APP_ID="YOUR_APP_ID"
-```
 
-### 3. Run the Development Server
+### 2. Run the Development Server
 ```bash
 npm run dev
 ```

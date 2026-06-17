@@ -45,7 +45,7 @@ export default function StaffPayrollView() {
   const [imageUploading, setImageUploading] = useState(false);
 
   const [activeSubTab, setActiveSubTab] = useState<"attendance" | "payroll" | "employees">("attendance");
-  const todayStr = "2026-06-10";
+  const todayStr = new Date().toLocaleDateString('en-CA');
 
   // Form states
   const [showAddEmp, setShowAddEmp] = useState(false);

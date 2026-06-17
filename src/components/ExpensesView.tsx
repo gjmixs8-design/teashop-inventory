@@ -28,7 +28,7 @@ export default function ExpensesView() {
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<ExpenseCategory>("Ingredients & Milk");
   const [description, setDescription] = useState("");
-  const [date, setDate] = useState("2026-06-10");
+  const [date, setDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [receiptName, setReceiptName] = useState("");
 
   const categories: ExpenseCategory[] = [
@@ -111,7 +111,7 @@ export default function ExpensesView() {
     setAmount("");
     setCategory("Ingredients & Milk");
     setDescription("");
-    setDate("2026-06-10");
+    setDate(new Date().toLocaleDateString('en-CA'));
     setReceiptName("");
     setShowAddForm(false);
   };

@@ -38,8 +38,11 @@ export default function SalesHistoryView() {
   const [isEditingBill, setIsEditingBill] = useState(false);
   const [editBillForm, setEditBillForm] = useState<Invoice | null>(null);
 
-  const todayStr = "2026-06-10";
-  const yesterdayStr = "2026-06-09";
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = yesterdayDate.toLocaleDateString('en-CA');
 
   const recalculateInvoiceTotals = (inv: Invoice): Invoice => {
     let subtotalTotal = 0;
@@ -95,8 +98,10 @@ export default function SalesHistoryView() {
       } else if (filterDateRange === "Yesterday") {
         matchDate = inv.date.startsWith(yesterdayStr);
       } else if (filterDateRange === "Week") {
-        // Last 7 days range (June 4 to June 10, 2026)
-        matchDate = inv.date.startsWith("2026-06-0") || inv.date.startsWith("2026-06-10");
+        const invoiceTime = new Date(inv.date).getTime();
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        matchDate = invoiceTime >= sevenDaysAgo.getTime();
       }
 
       // 3. Keywords search
