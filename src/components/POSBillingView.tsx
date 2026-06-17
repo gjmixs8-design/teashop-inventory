@@ -146,9 +146,16 @@ export default function POSBillingView() {
   };
 
   // Handle invoice submission
-  const handleCheckout = (e: React.FormEvent) => {
+  const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
+
+    // Phone validation (optional field, but if entered must be valid)
+    const phoneVal = customerPhone.trim();
+    if (phoneVal && !/^[0-9]{10}$/.test(phoneVal)) {
+      alert("Validation Error: Customer contact phone number must be exactly 10 digits.");
+      return;
+    }
 
     // Split validation
     let splitPayObj = undefined;
@@ -156,6 +163,12 @@ export default function POSBillingView() {
       const cashVal = parseFloat(splitCash) || 0;
       const upiVal = parseFloat(splitUpi) || 0;
       const cardVal = parseFloat(splitCard) || 0;
+
+      if (cashVal < 0 || upiVal < 0 || cardVal < 0) {
+        alert("Validation Error: Split payment amounts cannot be negative.");
+        return;
+      }
+
       const totalSplitPaid = cashVal + upiVal + cardVal;
 
       if (Math.abs(totalSplitPaid - totals.finalNet) > 0.05) {
@@ -175,12 +188,12 @@ export default function POSBillingView() {
       return;
     }
 
-    const created = createInvoice(
+    const created = await createInvoice(
       cart,
       discountVal,
       paymentMethod,
-      customerName,
-      customerPhone,
+      customerName.trim(),
+      phoneVal,
       splitPayObj
     );
 
@@ -341,7 +354,7 @@ export default function POSBillingView() {
       </div>
 
       {/* RIGHT: SHOPPING CART & CUSTOMER METRICS (4 or 5 Columns) */}
-      <div className="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sticky top-6">
+      <div id="pos-cart-section" className="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sticky top-6">
         <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
           <h3 className="text-sm font-extrabold text-gray-800 flex items-center gap-1.5">
             <ShoppingCart size={18} className="text-emerald-600" />
@@ -719,7 +732,7 @@ export default function POSBillingView() {
             </div>
 
             {/* Mock POS receipt container mimicking real thermal roll (58mm or 80mm width look) */}
-            <div className="bg-white text-black p-5 font-mono text-xs rounded-xl shadow-inner select-all border border-slate-300">
+            <div id="printable-receipt-card" className="bg-white text-black p-5 font-mono text-xs rounded-xl shadow-inner select-all border border-slate-300">
               {/* Receipt Header */}
               <div className="text-center space-y-1">
                 <span className="font-extrabold text-sm tracking-wider block">
@@ -857,6 +870,22 @@ export default function POSBillingView() {
           </div>
         </div>
       )}
-    </div>
+      {/* Mobile floating scroll-to-cart helper button */}
+      {cart.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("pos-cart-section");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth" });
+              }
+            }}
+            className="lg:hidden fixed bottom-20 right-4 bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 rounded-full shadow-lg z-20 flex items-center justify-center gap-1.5 animate-bounce font-extrabold text-xs cursor-pointer"
+          >
+            <ShoppingCart size={16} />
+            <span>View Cart ({cart.reduce((sum, i) => sum + i.quantity, 0)})</span>
+          </button>
+        )}
+      </div>
   );
 }

@@ -86,10 +86,23 @@ export default function ExpensesView() {
       return;
     }
 
+    const parsedAmount = parseFloat(amount);
+    const trimmedDesc = description.trim();
+
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      alert("Validation Error: Expense amount must be a positive number.");
+      return;
+    }
+
+    if (trimmedDesc.length < 3) {
+      alert("Validation Error: Expense description must be at least 3 characters long.");
+      return;
+    }
+
     addExpense({
       category,
-      amount: parseFloat(amount),
-      description,
+      amount: parsedAmount,
+      description: trimmedDesc,
       date,
       receiptName: receiptName || undefined,
     });

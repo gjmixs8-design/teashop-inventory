@@ -23,6 +23,10 @@ import {
   ShieldAlert,
   Sun,
   Moon,
+  Coffee,
+  Zap,
+  Mail,
+  Key,
 } from "lucide-react";
 
 // Views
@@ -36,12 +40,39 @@ import SalesHistoryView from "./components/SalesHistoryView";
 import SettingsView from "./components/SettingsView";
 
 function AppContent() {
-  const { session, setSession, products, rawMaterials, settings } = useApp();
+  const { 
+    session, 
+    setSession, 
+    products, 
+    rawMaterials, 
+    settings,
+    firebaseUser,
+    authLoading,
+    loginUser,
+    logoutUser
+  } = useApp();
 
   const [activeTab, setActiveTab] = useState<string>("dashboard");
-  const [currentTime, setCurrentTime] = useState<string>("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState<string>("");
+
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setLoginSubmitting(true);
+    try {
+      await loginUser(loginEmail, loginPassword);
+    } catch (err: any) {
+      setLoginError(err.message || "Failed to log in. Please check credentials.");
+    } finally {
+      setLoginSubmitting(false);
+    }
+  };
 
   const [theme, setTheme] = useState<string>(() => {
     const saved = localStorage.getItem("tea_theme");
@@ -136,7 +167,7 @@ function AppContent() {
           {/* Easy Simulator Quick Switch Panel */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/60 text-left space-y-3 shadow-inner">
             <div className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider text-center flex items-center justify-center gap-1">
-              <span>⚡ INSTANT SWITCH SIMULATOR ROLE</span>
+              <span><Zap size={12} className="inline mr-1 text-amber-500 animate-pulse" /> INSTANT SWITCH SIMULATOR ROLE</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -209,19 +240,94 @@ function AppContent() {
     }
   };
 
+  if (settings.strictAuthMode && authLoading) {
+    return (
+      <div className="h-dvh w-screen flex flex-col items-center justify-center bg-[#0a0c10] text-white">
+        <div className="space-y-4 text-center">
+          <Coffee size={48} className="mx-auto text-emerald-400 animate-bounce" />
+          <h2 className="text-sm font-black tracking-widest uppercase animate-pulse">Loading Chai Charcha ERP...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  if (settings.strictAuthMode && !firebaseUser) {
+    return (
+      <div className="h-dvh w-screen flex items-center justify-center bg-[#0a0c10] p-4 font-sans selection:bg-emerald-500/30 select-none">
+        <div className="w-full max-w-md bg-[#11141e] border border-[#242c3f] rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+          <div className="text-center space-y-2">
+            <div className="h-14 w-14 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto shadow-inner animate-pulse">
+              <Coffee size={28} />
+            </div>
+            <h2 className="text-xl font-display font-black text-slate-100 tracking-tight">Chai Charcha Cafe ERP</h2>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Strict Authentication Panel</p>
+          </div>
+
+          {loginError && (
+            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-xs font-semibold leading-relaxed flex items-start gap-2 animate-pulse">
+              <ShieldAlert size={16} className="shrink-0 mt-0.5" />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Email Address</label>
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  placeholder="name@chaicharcha.com"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-[#0c0e14] text-slate-200 border border-[#242c3f] rounded-xl text-xs focus:border-emerald-500/50 focus:outline-none transition-all placeholder:text-slate-600"
+                />
+                <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Security Password</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-[#0c0e14] text-slate-200 border border-[#242c3f] rounded-xl text-xs focus:border-emerald-500/50 focus:outline-none transition-all placeholder:text-slate-600"
+                />
+                <Key size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginSubmitting}
+              className="w-full py-3.5 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl focus:outline-none transition-all shadow-md active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {loginSubmitting ? "Authenticating Session..." : "Secure Sign In"}
+            </button>
+          </form>
+
+          <div className="pt-2 text-center border-t border-[#242c3f] space-y-1.5">
+            <p className="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider">Default Server Account</p>
+            <div className="p-2.5 bg-[#0c0e14] border border-[#242c3f] rounded-xl text-[10px] text-slate-400 font-semibold space-y-0.5 text-left leading-normal font-mono select-text">
+              <p>Email: <span className="text-emerald-400">admin@chaicharcha.com</span></p>
+              <p>Pass: <span className="text-emerald-400">admin123</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-screen overflow-hidden bg-slate-50/50 flex flex-col">
+    <div className="h-dvh overflow-hidden bg-slate-50/50 flex flex-col">
       {/* top navbar header */}
       <header className="h-16 bg-white border-b border-gray-150 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30 shadow-none flex-none">
         {/* Left: Brand name */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="md:hidden p-2 text-gray-500 hover:bg-slate-100 rounded-xl focus:outline-none"
-          >
-            <Menu size={20} />
-          </button>
-
           <div className="flex items-center gap-2.5 cursor-pointer select-none" onClick={() => setActiveTab("dashboard")}>
             {settings.logoUrl ? (
               <img
@@ -231,7 +337,7 @@ function AppContent() {
                 className="w-8 h-8 rounded-full border border-slate-200 object-cover shadow-xs"
               />
             ) : (
-              <span className="text-xl sm:text-2xl">☕</span>
+              <Coffee size={20} className="text-amber-600" />
             )}
             <span className="font-display font-extrabold text-xs sm:text-base text-slate-900 tracking-tight whitespace-nowrap truncate max-w-[85px] sm:max-w-none">
               {settings.shopName}
@@ -300,21 +406,42 @@ function AppContent() {
             </button>
           </div>
 
-          {/* User Session Role selection pill */}
-          <div
-            onClick={() => setActiveTab("settings")}
-            className="flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-800 rounded-xl cursor-pointer select-none font-bold transition-all shrink-0 max-w-[125px] sm:max-w-none text-xs"
-            title="Click to alternate simulating role"
-          >
-            <span className="truncate max-w-[50px] sm:max-w-[120px]">{session.userName}</span>
-            <span className="text-[8px] px-1 bg-indigo-200 rounded font-black uppercase text-indigo-900 shrink-0">
-              {session.role}
-            </span>
+          {/* User Session Role selection pill / Strict auth exit */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div
+              onClick={() => {
+                if (!settings.strictAuthMode) {
+                  setActiveTab("settings");
+                }
+              }}
+              className={`flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-800 rounded-xl select-none font-bold transition-all text-xs ${
+                settings.strictAuthMode ? "cursor-default" : "cursor-pointer"
+              }`}
+              title={settings.strictAuthMode ? "Signed in user profile" : "Click to alternate simulating role"}
+            >
+              <span className="truncate max-w-[65px] sm:max-w-[120px]">{session.userName}</span>
+              <span className="text-[8px] px-1 bg-indigo-200 rounded font-black uppercase text-indigo-900 shrink-0">
+                {session.role}
+              </span>
+            </div>
+            
+            {settings.strictAuthMode && firebaseUser && (
+              <button
+                onClick={async () => {
+                  if (window.confirm("Are you sure you want to sign out and lock the session?")) {
+                    await logoutUser();
+                  }
+                }}
+                className="p-1.5 px-3 bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 rounded-xl text-[10px] font-extrabold uppercase transition-all cursor-pointer shrink-0"
+              >
+                Exit
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      <div className="flex-1 flex w-full overflow-hidden">
+      <div className="flex-1 flex w-full overflow-hidden min-h-0">
         {/* DESKTOP SIDEBAR NAVIGATION (Visible on MD and larger) */}
         <aside className="hidden md:flex flex-col justify-between w-64 border-r border-gray-150 p-4 bg-white select-none shrink-0 h-full overflow-y-auto">
           <div className="flex flex-col space-y-1.5 flex-1 select-none">
@@ -330,7 +457,6 @@ function AppContent() {
                   key={item.id}
                   onClick={() => {
                     setActiveTab(item.id);
-                    setMobileMenuOpen(false);
                   }}
                   className={`w-full flex items-center justify-between p-2.5 px-3 rounded-xl transition-all text-left focus:outline-none ${
                     isActive
@@ -352,202 +478,165 @@ function AppContent() {
           </div>
 
           <div className="pt-4 border-t font-semibold text-[11px] text-gray-400 text-center max-w-[200px] mx-auto mt-4 leading-normal">
-            ⚙️ ChaiCharcha Billing system is online & active.
+            <span className="flex items-center justify-center gap-1"><Settings size={12} className="text-slate-400" /> ChaiCharcha Billing system is online & active.</span>
           </div>
         </aside>
 
         {/* MAIN DISPLAY VIEWPORT SCREEN */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto h-full pb-24 md:pb-8">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto h-full pb-6 md:pb-8">
           {renderActiveView()}
         </main>
       </div>
 
       {/* MOBILE BOTTOM NAVIGATION (Visible on Mobile only) */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-150 h-16 flex items-center justify-around px-2 z-30 shadow-lg">
-        {/* Dashboard */}
+      <nav className="md:hidden flex-none bg-white border-t border-slate-150 h-16 flex items-center justify-around px-2 z-30 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] select-none">
+        {/* Dashboard Tab */}
         <button
-          onClick={() => {
-            setActiveTab("dashboard");
-            setMobileMoreOpen(false);
-          }}
-          className={`flex flex-col items-center justify-center flex-1 py-1 focus:outline-none ${
-            activeTab === "dashboard" ? "text-emerald-600" : "text-gray-400 hover:text-gray-650"
+          onClick={() => setActiveTab("dashboard")}
+          className={`flex flex-col items-center justify-center flex-1 h-full focus:outline-none relative transition-all duration-200 ${
+            activeTab === "dashboard"
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-350"
           }`}
         >
-          <LayoutDashboard size={20} />
-          <span className="text-[10px] font-bold mt-1">Dashboard</span>
+          <div className={`p-1.5 px-4 rounded-full transition-all duration-200 flex items-center justify-center ${
+            activeTab === "dashboard"
+              ? "bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/10"
+              : "bg-transparent border border-transparent"
+          }`}>
+            <LayoutDashboard size={18} className={activeTab === "dashboard" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"} />
+          </div>
+          <span className={`text-[9px] mt-1 text-center font-extrabold tracking-wide ${
+            activeTab === "dashboard" ? "font-black text-emerald-600 dark:text-emerald-400" : "font-semibold text-slate-400 dark:text-slate-500"
+          }`}>
+            Dashboard
+          </span>
         </button>
 
-        {/* POS */}
+        {/* POS Tab */}
         <button
-          onClick={() => {
-            setActiveTab("pos");
-            setMobileMoreOpen(false);
-          }}
-          className={`flex flex-col items-center justify-center flex-1 py-1 focus:outline-none ${
-            activeTab === "pos" ? "text-emerald-600" : "text-gray-400 hover:text-gray-650"
+          onClick={() => setActiveTab("pos")}
+          className={`flex flex-col items-center justify-center flex-1 h-full focus:outline-none relative transition-all duration-200 ${
+            activeTab === "pos"
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-350"
           }`}
         >
-          <ShoppingBag size={20} />
-          <span className="text-[10px] font-bold mt-1">POS Billing</span>
+          <div className={`p-1.5 px-4 rounded-full transition-all duration-200 flex items-center justify-center ${
+            activeTab === "pos"
+              ? "bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/10"
+              : "bg-transparent border border-transparent"
+          }`}>
+            <ShoppingBag size={18} className={activeTab === "pos" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"} />
+          </div>
+          <span className={`text-[9px] mt-1 text-center font-extrabold tracking-wide ${
+            activeTab === "pos" ? "font-black text-emerald-600 dark:text-emerald-400" : "font-semibold text-slate-400 dark:text-slate-500"
+          }`}>
+            POS
+          </span>
         </button>
 
-        {/* Inventory */}
+        {/* Inventory Tab */}
         <button
-          onClick={() => {
-            setActiveTab("inventory");
-            setMobileMoreOpen(false);
-          }}
-          className={`flex flex-col items-center justify-center flex-1 py-1 focus:outline-none ${
-            activeTab === "inventory" ? "text-emerald-600" : "text-gray-400 hover:text-gray-650"
+          onClick={() => setActiveTab("inventory")}
+          className={`flex flex-col items-center justify-center flex-1 h-full focus:outline-none relative transition-all duration-200 ${
+            activeTab === "inventory"
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-350"
           }`}
         >
-          <Layers size={20} />
-          <span className="text-[10px] font-bold mt-1">Stock</span>
+          <div className={`p-1.5 px-4 rounded-full transition-all duration-200 flex items-center justify-center ${
+            activeTab === "inventory"
+              ? "bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/10"
+              : "bg-transparent border border-transparent"
+          }`}>
+            <Layers size={18} className={activeTab === "inventory" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"} />
+          </div>
+          <span className={`text-[9px] mt-1 text-center font-extrabold tracking-wide ${
+            activeTab === "inventory" ? "font-black text-emerald-600 dark:text-emerald-400" : "font-semibold text-slate-400 dark:text-slate-500"
+          }`}>
+            Inventory
+          </span>
         </button>
 
-        {/* More button */}
+        {/* More Tab */}
         <button
-          onClick={() => {
-            setMobileMoreOpen(!mobileMoreOpen);
-          }}
-          className={`flex flex-col items-center justify-center flex-1 py-1 focus:outline-none ${
-            mobileMoreOpen || ["payroll", "expenses", "suppliers", "history", "settings"].includes(activeTab)
-              ? "text-indigo-600"
-              : "text-gray-400 hover:text-gray-650"
+          onClick={() => setMobileMoreOpen(true)}
+          className={`flex flex-col items-center justify-center flex-1 h-full focus:outline-none relative transition-all duration-200 ${
+            !["dashboard", "pos", "inventory"].includes(activeTab)
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-350"
           }`}
         >
-          <Menu size={20} />
-          <span className="text-[10px] font-bold mt-1">More Operations</span>
+          <div className={`p-1.5 px-4 rounded-full transition-all duration-200 flex items-center justify-center ${
+            !["dashboard", "pos", "inventory"].includes(activeTab)
+              ? "bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/10"
+              : "bg-transparent border border-transparent"
+          }`}>
+            <Menu size={18} className={!["dashboard", "pos", "inventory"].includes(activeTab) ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"} />
+          </div>
+          <span className={`text-[9px] mt-1 text-center font-extrabold tracking-wide ${
+            !["dashboard", "pos", "inventory"].includes(activeTab) ? "font-black text-emerald-600 dark:text-emerald-400" : "font-semibold text-slate-400 dark:text-slate-500"
+          }`}>
+            More
+          </span>
         </button>
       </nav>
 
-      {/* MOBILE MORE OPERATIONS DRAWER SCREEN */}
+      {/* MOBILE "MORE" MENU BOTTOM SHEET DRAWER */}
       {mobileMoreOpen && (
-        <div className="md:hidden fixed inset-x-0 bottom-16 bg-white border-t border-slate-200 z-20 shadow-2xl p-4 space-y-3 animate-fade-in">
-          <div className="flex justify-between items-center pb-2 border-b">
-            <span className="text-xs font-black text-slate-500 uppercase">Operational Modules</span>
-            <button
-              onClick={() => setMobileMoreOpen(false)}
-              className="text-gray-400 hover:text-gray-600 focus:outline-none"
-            >
-              <X size={16} />
-            </button>
-          </div>
+        <div className="md:hidden fixed inset-0 z-50 bg-black/60 flex items-end justify-center" onClick={() => setMobileMoreOpen(false)}>
+          <div 
+            className="bg-white dark:bg-[#11141e] w-full max-w-md rounded-t-3xl p-6 pb-8 space-y-6 shadow-2xl border-t border-slate-200 dark:border-slate-800 animate-slide-up transform transition-all duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header/Grabber */}
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
+              <h3 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mt-2">More Workspace Panels</h3>
+            </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              onClick={() => {
-                setActiveTab("payroll");
-                setMobileMoreOpen(false);
-              }}
-              className={`p-3 rounded-xl border flex flex-col items-start gap-1 font-bold ${
-                activeTab === "payroll" ? "bg-indigo-50 border-indigo-500 text-indigo-900" : "bg-slate-50 border-slate-100 text-slate-700"
-              }`}
-            >
-              <Users size={16} className="text-gray-405" />
-              <span>Staff attendance</span>
-            </button>
+            {/* List/Grid of other views */}
+            <div className="grid grid-cols-2 gap-3">
+              {menuItems
+                .filter((item) => !["dashboard", "pos", "inventory"].includes(item.id))
+                .map((item) => {
+                  const IconComp = item.icon;
+                  const isActive = activeTab === item.id;
+                  const isRestricted = isTabRestricted(item.id, session.role);
 
-            <button
-              onClick={() => {
-                setActiveTab("expenses");
-                setMobileMoreOpen(false);
-              }}
-              className={`p-3 rounded-xl border flex flex-col items-start gap-1 font-bold ${
-                activeTab === "expenses" ? "bg-indigo-50 border-indigo-500 text-indigo-900" : "bg-slate-50 border-slate-100 text-slate-700"
-              }`}
-            >
-              <FileMinus size={16} className="text-gray-405" />
-              <span>Log Expenses</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab("suppliers");
-                setMobileMoreOpen(false);
-              }}
-              className={`p-3 rounded-xl border flex flex-col items-start gap-1 font-bold ${
-                activeTab === "suppliers" ? "bg-indigo-50 border-indigo-500 text-indigo-900" : "bg-slate-50 border-slate-100 text-slate-700"
-              }`}
-            >
-              <Truck size={16} className="text-gray-405" />
-              <span>Suppliers bulk</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab("history");
-                setMobileMoreOpen(false);
-              }}
-              className={`p-3 rounded-xl border flex flex-col items-start gap-1 font-bold ${
-                activeTab === "history" ? "bg-indigo-50 border-indigo-500 text-indigo-900" : "bg-slate-50 border-slate-100 text-slate-700"
-              }`}
-            >
-              <History size={16} className="text-gray-405" />
-              <span>Sales Receipts</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab("settings");
-                setMobileMoreOpen(false);
-              }}
-              className={`p-3 rounded-xl border col-span-2 flex items-center gap-2.5 font-bold ${
-                activeTab === "settings" ? "bg-indigo-50 border-indigo-500 text-indigo-900" : "bg-slate-50 border-slate-100 text-slate-700"
-              }`}
-            >
-              <Settings size={16} className="text-gray-405" />
-              <span>Settings & Role Simulator switcher</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MOBILE LEFT MENU DRAWER - FALLBACK BACKSTOP FOR SIDE NAVIGATION */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden flex">
-          {/* Backdrop click barrier */}
-          <div className="bg-black/60 backdrop-blur-xs flex-1" onClick={() => setMobileMenuOpen(false)}></div>
-
-          {/* Drawer content drawer */}
-          <div className="bg-white w-64 p-5 flex flex-col justify-between shadow-2xl animate-slide-in relative">
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 focus:outline-none"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="space-y-4">
-              <span className="text-xl sm:text-2xl mt-2 block">☕ Chai Charcha</span>
-              <div className="border-b pb-2"></div>
-
-              <div className="space-y-1.5 font-semibold text-slate-600">
-                {menuItems.map((item) => {
-                  const Icon = item.icon;
                   return (
                     <button
                       key={item.id}
                       onClick={() => {
                         setActiveTab(item.id);
-                        setMobileMenuOpen(false);
+                        setMobileMoreOpen(false);
                       }}
-                      className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs ${
-                        activeTab === item.id ? "bg-slate-900 text-white font-extrabold" : "hover:bg-slate-50"
+                      className={`flex items-center gap-3 p-3 px-4 rounded-xl border transition-all cursor-pointer relative text-left ${
+                        isActive
+                          ? "bg-emerald-500/10 border-emerald-500/35 text-emerald-600 dark:text-emerald-400"
+                          : "bg-slate-50 border-slate-200/50 hover:bg-slate-100 text-slate-700 dark:bg-[#151a26] dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
                       }`}
                     >
-                      <Icon size={14} />
-                      {item.label}
+                      <IconComp size={18} className={isActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold truncate leading-tight">{item.label}</p>
+                      </div>
+                      {isRestricted && (
+                        <Lock size={10} className="text-rose-500 bg-rose-50 dark:bg-rose-950/40 rounded p-0.5 shrink-0" />
+                      )}
                     </button>
                   );
                 })}
-              </div>
             </div>
 
-            <div className="text-[10px] text-gray-400 text-center border-t pt-4">
-              Chai Charcha Hub v2.6
-            </div>
+            {/* Cancel Button */}
+            <button
+              onClick={() => setMobileMoreOpen(false)}
+              className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-extrabold text-xs rounded-xl focus:outline-none transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

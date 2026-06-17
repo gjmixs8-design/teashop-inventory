@@ -401,6 +401,7 @@ export const initialEmployees: Employee[] = [
     salaryAmount: 18500,
     active: true,
     avatarColor: "bg-teal-500",
+    email: "chef@chaicharcha.com",
   },
   {
     id: "emp-2",
@@ -413,6 +414,7 @@ export const initialEmployees: Employee[] = [
     salaryAmount: 14000,
     active: true,
     avatarColor: "bg-purple-500",
+    email: "cashier@chaicharcha.com",
   },
   {
     id: "emp-3",
@@ -425,6 +427,7 @@ export const initialEmployees: Employee[] = [
     salaryAmount: 500, // ₹500 wages per day
     active: true,
     avatarColor: "bg-amber-500",
+    email: "staff@chaicharcha.com",
   },
   {
     id: "emp-4",
@@ -437,6 +440,7 @@ export const initialEmployees: Employee[] = [
     salaryAmount: 24000,
     active: true,
     avatarColor: "bg-rose-500",
+    email: "admin@chaicharcha.com",
   }
 ];
 
@@ -787,5 +791,6 @@ export const defaultShopSettings: ShopSettings = {
   taxRateDefault: 5, // 5% GST on food service default
   taxEnabled: true,
   currency: "₹",
-  thermalWidth: "80mm"
+  thermalWidth: "80mm",
+  strictAuthMode: false
 };

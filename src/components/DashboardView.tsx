@@ -21,6 +21,7 @@ import {
   DollarSign,
   Briefcase,
   FileMinus,
+  Coffee,
 } from "lucide-react";
 import { Product, Invoice } from "../types";
 
@@ -172,8 +173,8 @@ export default function DashboardView({ setActiveTab }: { setActiveTab: (tab: st
       {/* Upper Banner with Quick Action triggers */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-6 rounded-2xl shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold font-sans tracking-tight">
-            Chai Charcha Hub ☕
+          <h2 className="text-2xl font-bold font-sans tracking-tight flex items-center gap-2">
+            Chai Charcha Hub <Coffee size={24} className="text-amber-300" />
           </h2>
           <p className="text-emerald-100 text-sm mt-1">
             Running in <span className="font-semibold">{session.role} view</span>. Monitor billing, ingredients, staff payroll and analytics in real time.

@@ -20,8 +20,10 @@ import {
   Minus,
   Briefcase,
   Layers3,
+  Camera,
 } from "lucide-react";
-import { Product, RawMaterial, StockMovementLog } from "../types";
+import { Product, RawMaterial, StockMovementLog, RecipeItem } from "../types";
+import { uploadImageToStorage } from "../firebase";
 
 export default function InventoryView() {
   const {
@@ -38,6 +40,8 @@ export default function InventoryView() {
     deleteRawMaterial,
     recordStockMovement,
   } = useApp();
+
+  const [imageUploading, setImageUploading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"products" | "raw" | "logs">("products");
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,6 +63,7 @@ export default function InventoryView() {
     taxPercent: "5",
     supplierId: "",
     image: "",
+    recipe: [] as RecipeItem[],
   });
 
   const [rForm, setRForm] = useState({
@@ -100,20 +105,23 @@ export default function InventoryView() {
     );
   }, [stockMovementLogs, searchQuery]);
 
-  const handleDeviceImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeviceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        alert("Alert: This image is too large! Please choose a smaller image (under 2MB) for optimal browser storage.");
+        alert("Alert: This image is too large! Please choose a smaller image (under 2MB) for optimal storage.");
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setPForm(prev => ({ ...prev, image: reader.result }));
-        }
-      };
-      reader.readAsDataURL(file);
+      setImageUploading(true);
+      try {
+        const url = await uploadImageToStorage("products", file.name, file);
+        setPForm(prev => ({ ...prev, image: url }));
+      } catch (err) {
+        console.error("Image upload failed:", err);
+        alert("Image upload failed.");
+      } finally {
+        setImageUploading(false);
+      }
     }
   };
 
@@ -129,20 +137,52 @@ export default function InventoryView() {
     if (activeTab === "products") {
       if (!pForm.name || !pForm.sellingPrice || !pForm.purchasePrice || pForm.stock === "") return;
 
+      const sellPrice = Number(pForm.sellingPrice);
+      const buyPrice = Number(pForm.purchasePrice);
+      const stockVal = Number(pForm.stock);
+      const minStockVal = Number(pForm.minStock) || 0;
+      const taxVal = Number(pForm.taxPercent) || 0;
+
+      if (isNaN(sellPrice) || sellPrice <= 0) {
+        alert("Validation Error: Selling Price must be a positive number!");
+        return;
+      }
+      if (isNaN(buyPrice) || buyPrice <= 0) {
+        alert("Validation Error: Purchase Price must be a positive number!");
+        return;
+      }
+      if (buyPrice >= sellPrice) {
+        alert("Validation Error: Purchase Price must be less than Selling Price to avoid losses!");
+        return;
+      }
+      if (isNaN(stockVal) || stockVal < 0) {
+        alert("Validation Error: Stock must be a non-negative number!");
+        return;
+      }
+      if (isNaN(minStockVal) || minStockVal < 0) {
+        alert("Validation Error: Minimum Stock must be a non-negative number!");
+        return;
+      }
+      if (isNaN(taxVal) || taxVal < 0 || taxVal > 100) {
+        alert("Validation Error: Tax Rate must be between 0% and 100%!");
+        return;
+      }
+
       const generatedSku = pForm.sku || `CH-${pForm.name.slice(0, 3).toUpperCase()}-${Math.floor(10 + Math.random() * 90)}`;
 
       const data = {
         name: pForm.name,
         category: pForm.category,
         sku: generatedSku,
-        sellingPrice: parseFloat(pForm.sellingPrice),
-        purchasePrice: parseFloat(pForm.purchasePrice),
-        stock: parseInt(pForm.stock),
-        minStock: parseInt(pForm.minStock) || 0,
+        sellingPrice: sellPrice,
+        purchasePrice: buyPrice,
+        stock: stockVal,
+        minStock: minStockVal,
         unit: pForm.unit,
-        taxPercent: parseInt(pForm.taxPercent) || 0,
+        taxPercent: taxVal,
         supplierId: pForm.supplierId || undefined,
         image: pForm.image || undefined,
+        recipe: pForm.recipe && pForm.recipe.length > 0 ? pForm.recipe : undefined,
       };
 
       if (editingItem && editingItem.type === "p") {
@@ -164,17 +204,37 @@ export default function InventoryView() {
         taxPercent: "5",
         supplierId: "",
         image: "",
+        recipe: [],
       });
     } else {
       // Raw Materials
       if (!rForm.name || rForm.stock === "" || !rForm.purchasePrice) return;
 
+      const rStock = parseFloat(rForm.stock);
+      const rMinStock = parseFloat(rForm.minStock) || 0;
+      const rPrice = parseFloat(rForm.purchasePrice);
+
+      if (isNaN(rStock) || rStock < 0) {
+        alert("Validation Error: Raw material stock must be a non-negative number.");
+        return;
+      }
+
+      if (isNaN(rMinStock) || rMinStock < 0) {
+        alert("Validation Error: Minimum stock level must be a non-negative number.");
+        return;
+      }
+
+      if (isNaN(rPrice) || rPrice <= 0) {
+        alert("Validation Error: Average purchase price must be a positive number.");
+        return;
+      }
+
       const data = {
-        name: rForm.name,
-        stock: parseFloat(rForm.stock),
+        name: rForm.name.trim(),
+        stock: rStock,
         unit: rForm.unit,
-        minStock: parseFloat(rForm.minStock) || 0,
-        purchasePrice: parseFloat(rForm.purchasePrice),
+        minStock: rMinStock,
+        purchasePrice: rPrice,
         supplierId: rForm.supplierId || undefined,
       };
 
@@ -219,6 +279,7 @@ export default function InventoryView() {
         taxPercent: item.taxPercent.toString(),
         supplierId: item.supplierId || "",
         image: item.image || "",
+        recipe: item.recipe || [],
       });
     } else {
       setRForm({
@@ -251,7 +312,10 @@ export default function InventoryView() {
 
     if (!adjustingItem || !adjustQty) return;
     const numQty = parseFloat(adjustQty);
-    if (isNaN(numQty) || numQty === 0) return;
+    if (isNaN(numQty) || numQty === 0) {
+      alert("Validation Error: Please enter a valid non-zero quantity for adjustment.");
+      return;
+    }
 
     // Apply multiplier: adjustment or damage reduce standard quantities (let's check sign)
     // If "Damaged" or "Adjustment" is negative, let's process it. User can input positive / negative.
@@ -511,7 +575,18 @@ export default function InventoryView() {
                           )}
                           <div className="min-w-0">
                             <div className="font-extrabold text-slate-800 text-xs sm:text-sm truncate max-w-[200px]">{p.name}</div>
-                            <div className="text-[10px] text-gray-400 font-semibold mt-0.5">Tax rate: Gst {p.taxPercent}% inclusive</div>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] text-gray-400 font-semibold">Gst {p.taxPercent}%</span>
+                              {p.recipe && p.recipe.length > 0 ? (
+                                <span className="bg-teal-50 text-teal-800 px-1.5 py-0.2 rounded font-black text-[8px]">
+                                  BOM: {p.recipe.length} Ingredients
+                                </span>
+                              ) : (
+                                <span className="bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded font-bold text-[8px]">
+                                  No BOM
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -1167,9 +1242,11 @@ export default function InventoryView() {
                         />
                         <label
                           htmlFor="device-image-uploader-btn"
-                          className="w-full sm:w-auto px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-250 border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-705 text-slate-700 dark:text-slate-300 hover:text-slate-900 text-xs font-extrabold rounded-xl cursor-pointer flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 duration-100"
+                          className={`w-full sm:w-auto px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-extrabold rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 duration-100 ${
+                            imageUploading ? "opacity-50 pointer-events-none" : "hover:bg-slate-250 hover:text-slate-900"
+                          }`}
                         >
-                          📸 Device Image
+                          <Camera size={14} className="inline mr-1" /> {imageUploading ? "Uploading..." : "Device Image"}
                         </label>
                       </div>
                     </div>
@@ -1231,6 +1308,106 @@ export default function InventoryView() {
                       </div>
                     </div>
                   )}
+                  {/* RECIPE / BOM SECTION */}
+                  <div className="border-t pt-3.5 space-y-2.5">
+                    <span className="text-xs font-bold text-teal-800 block">Recipe / Bill of Materials (BOM)</span>
+                    
+                    {/* Add Recipe Item Controls */}
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-6">
+                        <label className="text-[10px] font-bold text-gray-400 block mb-0.5">SELECT INGREDIENT</label>
+                        <select
+                          id="recipe-material-select"
+                          className="w-full p-1.5 border rounded-lg text-xs font-semibold focus:outline-none"
+                        >
+                          <option value="">-- Choose Raw Material --</option>
+                          {rawMaterials.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name} ({m.unit})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-4">
+                        <label className="text-[10px] font-bold text-gray-400 block mb-0.5">QTY NEEDED</label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          placeholder="0.05"
+                          id="recipe-material-qty"
+                          className="w-full px-2 py-1.5 border rounded-lg text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const selectEl = document.getElementById("recipe-material-select") as HTMLSelectElement;
+                            const qtyEl = document.getElementById("recipe-material-qty") as HTMLInputElement;
+                            const mId = selectEl?.value;
+                            const qty = parseFloat(qtyEl?.value);
+                            
+                            if (mId && qty > 0) {
+                              const alreadyHas = pForm.recipe?.some((r) => r.materialId === mId);
+                              if (alreadyHas) {
+                                alert("This ingredient is already in the recipe!");
+                                return;
+                              }
+                              
+                              setPForm({
+                                ...pForm,
+                                recipe: [...(pForm.recipe || []), { materialId: mId, quantity: qty }]
+                              });
+                              
+                              // Reset qty input
+                              qtyEl.value = "";
+                            }
+                          }}
+                          className="w-full py-2 bg-slate-900 text-white hover:bg-slate-800 text-xs font-black rounded-lg transition-colors flex items-center justify-center cursor-pointer"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Current Recipe Items list */}
+                    {pForm.recipe && pForm.recipe.length > 0 ? (
+                      <div className="bg-slate-50 p-2 rounded-xl border space-y-1.5 max-h-32 overflow-y-auto">
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Recipe Composition (Per Unit of Product)</span>
+                        {pForm.recipe.map((rItem) => {
+                          const mat = rawMaterials.find((m) => m.id === rItem.materialId);
+                          return (
+                            <div key={rItem.materialId} className="flex justify-between items-center bg-white p-1.5 px-2.5 rounded-lg text-xs shadow-2xs">
+                              <span className="font-bold text-slate-700 truncate max-w-[150px]">
+                                {mat?.name || "Unknown"}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-gray-500 font-semibold">
+                                  {rItem.quantity} {mat?.unit || ""}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPForm({
+                                      ...pForm,
+                                      recipe: pForm.recipe.filter((item) => item.materialId !== rItem.materialId)
+                                    });
+                                  }}
+                                  className="text-rose-500 hover:text-rose-600 focus:outline-none"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-gray-400 italic bg-slate-50 p-2 rounded-xl text-center border">
+                        No recipe linked yet. Selling this product will not decrement raw materials.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (

@@ -19,11 +19,15 @@ import {
   DollarSign,
   Tag,
   CheckCircle,
+  Eye,
+  Trash2,
+  Edit2,
+  FileText,
 } from "lucide-react";
 import { Invoice } from "../types";
 
 export default function SalesHistoryView() {
-  const { invoices, refundInvoice, settings, session } = useApp();
+  const { invoices, refundInvoice, deleteInvoice, editInvoice, settings, session } = useApp();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPayment, setFilterPayment] = useState<string>("All");
@@ -31,9 +35,52 @@ export default function SalesHistoryView() {
 
   // Selected invoice for thermal reprinting modal
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isEditingBill, setIsEditingBill] = useState(false);
+  const [editBillForm, setEditBillForm] = useState<Invoice | null>(null);
 
   const todayStr = "2026-06-10";
   const yesterdayStr = "2026-06-09";
+
+  const recalculateInvoiceTotals = (inv: Invoice): Invoice => {
+    let subtotalTotal = 0;
+    let taxTotalAmount = 0;
+    let profitAmount = 0;
+    let itemsPriceSum = 0;
+
+    const invoiceItems = inv.items.map((item) => {
+      const totalItemPrice = item.price * item.quantity;
+      itemsPriceSum += totalItemPrice;
+
+      // Calculate tax inclusive (default 5% if enabled, else 0%)
+      const taxPercent = settings.taxEnabled ? 5 : 0;
+      const taxAmount = (totalItemPrice * taxPercent) / (100 + taxPercent);
+      const subtotalVal = totalItemPrice - taxAmount;
+
+      subtotalTotal += subtotalVal;
+      taxTotalAmount += taxAmount;
+
+      const profitVal = (item.price - item.costPrice) * item.quantity;
+      profitAmount += profitVal;
+
+      return {
+        ...item,
+        taxAmount: Number(taxAmount.toFixed(2)),
+      };
+    });
+
+    const finalTotal = Math.max(0, itemsPriceSum - inv.discountAmount);
+    const discountRatio = itemsPriceSum > 0 ? finalTotal / itemsPriceSum : 1;
+    const adjustedProfit = Number((profitAmount * discountRatio).toFixed(2));
+
+    return {
+      ...inv,
+      items: invoiceItems,
+      subtotal: Number(subtotalTotal.toFixed(2)),
+      taxTotal: Number(taxTotalAmount.toFixed(2)),
+      total: finalTotal,
+      profit: adjustedProfit,
+    };
+  };
 
   // Calculations & filtering
   const filteredInvoices = useMemo(() => {
@@ -120,7 +167,7 @@ export default function SalesHistoryView() {
         <div className="bg-white p-5 rounded-2xl border border-gray-150 shadow-xs col-span-2 md:col-span-1 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-gray-500 text-xs sm:text-sm font-medium">Avg Order Basket Value</span>
-            <span className="text-gray-300 scale-90">📋</span>
+            <span className="text-gray-300 scale-90"><FileText size={15} /></span>
           </div>
           <div className="mt-3">
             <h3 className="text-2xl font-black text-gray-900 leading-none">
@@ -256,22 +303,50 @@ export default function SalesHistoryView() {
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
-                    onClick={() => setSelectedInvoice(inv)}
-                    className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg focus:outline-none flex items-center gap-1 font-bold"
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setEditBillForm(inv);
+                      setIsEditingBill(false);
+                    }}
+                    className="p-1 bg-slate-100 hover:bg-slate-200 text-indigo-650 rounded-lg focus:outline-none"
+                    title="View & Edit Invoice"
+                  >
+                    <Eye size={12} />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setEditBillForm(inv);
+                      setIsEditingBill(false);
+                    }}
+                    className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg focus:outline-none"
                     title="Thermal Receipt Reprint"
                   >
-                    <Printer size={11} />
-                    <span>Print</span>
+                    <Printer size={12} />
                   </button>
 
                   {["Admin", "Manager"].includes(session.role) && (
                     <button
+                      onClick={() => {
+                        if (confirm(`Are you sure you want to delete invoice ${inv.billNo}?`)) {
+                          deleteInvoice(inv.id);
+                        }
+                      }}
+                      className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg focus:outline-none"
+                      title="Delete Invoice Record"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+
+                  {["Admin", "Manager"].includes(session.role) && (
+                    <button
                       onClick={() => handleRefund(inv.id)}
-                      className="p-1 px-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg focus:outline-none flex items-center gap-0.5 font-bold"
+                      className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-lg focus:outline-none"
                       title="Refund Invoice Order"
                     >
-                      <RotateCcw size={11} />
-                      <span>Refund</span>
+                      <RotateCcw size={12} />
                     </button>
                   )}
                 </div>
@@ -365,12 +440,42 @@ export default function SalesHistoryView() {
                   <td className="py-3 px-4 text-center">
                     <div className="inline-flex gap-2.5">
                       <button
-                        onClick={() => setSelectedInvoice(inv)}
+                        onClick={() => {
+                          setSelectedInvoice(inv);
+                          setEditBillForm(inv);
+                          setIsEditingBill(false);
+                        }}
+                        className="p-1 bg-slate-100 hover:bg-slate-200 text-indigo-600 rounded-lg focus:outline-none"
+                        title="View & Edit Invoice"
+                      >
+                        <Eye size={13} />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setSelectedInvoice(inv);
+                          setEditBillForm(inv);
+                          setIsEditingBill(false);
+                        }}
                         className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg focus:outline-none"
                         title="Thermal Receipt Reprint"
                       >
                         <Printer size={13} />
                       </button>
+
+                      {["Admin", "Manager"].includes(session.role) && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete invoice ${inv.billNo}?`)) {
+                              deleteInvoice(inv.id);
+                            }
+                          }}
+                          className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg focus:outline-none"
+                          title="Delete Invoice Record"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
 
                       {["Admin", "Manager"].includes(session.role) && (
                         <button
@@ -403,7 +508,11 @@ export default function SalesHistoryView() {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-40 overflow-y-auto">
           <div className="bg-slate-800 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl relative my-8">
             <button
-              onClick={() => setSelectedInvoice(null)}
+              onClick={() => {
+                setSelectedInvoice(null);
+                setEditBillForm(null);
+                setIsEditingBill(false);
+              }}
               className="absolute top-4 right-4 text-slate-400 hover:text-white focus:outline-none bg-slate-700 p-1.5 rounded-full"
             >
               <X size={16} />
@@ -411,126 +520,264 @@ export default function SalesHistoryView() {
 
             <div className="text-center text-indigo-400">
               <Receipt size={32} className="mx-auto mb-1 animate-pulse" />
-              <h4 className="text-base font-extrabold uppercase">Bill Reprint Terminal</h4>
-              <p className="text-[11px] text-slate-300">Displaying system receipt values from database</p>
+              <h4 className="text-base font-extrabold uppercase">
+                {isEditingBill ? "Edit Invoice Details" : "Bill Reprint Terminal"}
+              </h4>
+              <p className="text-[11px] text-slate-300">
+                {isEditingBill ? "Update transaction details in database" : "Displaying system receipt values from database"}
+              </p>
             </div>
 
-            {/* Thermal container replicated */}
-            <div className="bg-white text-black p-5 font-mono text-xs rounded-xl shadow-inner select-all border border-slate-300">
-              {/* Receipt Header */}
-              <div className="text-center space-y-1">
-                <span className="font-extrabold text-sm tracking-wider block">
-                  *** {settings.shopName.toUpperCase()} ***
-                </span>
-                <p className="text-[10px] leading-tight text-gray-600">
-                  {settings.address}
-                </p>
-                <p className="text-[10px] text-gray-600 leading-none">
-                  Phone: {settings.contactNumber}
-                </p>
-                {settings.gstNo && (
-                  <p className="text-[10px] text-gray-600 leading-none">
-                    GSTIN: {settings.gstNo}
-                  </p>
-                )}
-                <div className="border-t border-dashed border-black my-2"></div>
-              </div>
-
-              {/* Bill Details */}
-              <div className="space-y-1 text-[10px]">
-                <div className="flex justify-between">
-                  <span>Bill No: {selectedInvoice.billNo}</span>
-                  <span>Payment: {selectedInvoice.paymentMethod}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Reprint date: {new Date().toLocaleDateString()}</span>
-                  <span>Shift: A</span>
-                </div>
-                {selectedInvoice.customerName && (
-                  <div className="flex justify-between border-t border-dashed border-gray-100 pt-1 mt-1 font-bold">
-                    <span>Cust: {selectedInvoice.customerName}</span>
-                    <span>No: {selectedInvoice.customerPhone || "N/A"}</span>
+            {isEditingBill && editBillForm ? (
+              <div className="bg-white text-slate-800 p-4 rounded-xl space-y-3 text-xs border border-slate-300">
+                <h5 className="font-extrabold text-slate-800 text-xs border-b pb-1 text-center">Edit Customer & Item values</h5>
+                
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">CUSTOMER NAME</label>
+                    <input
+                      type="text"
+                      value={editBillForm.customerName || ""}
+                      onChange={(e) => setEditBillForm({ ...editBillForm, customerName: e.target.value })}
+                      className="w-full px-2 py-1.5 border rounded-lg text-xs bg-white text-slate-800"
+                    />
                   </div>
-                )}
-                <div className="border-t border-dashed border-black my-2"></div>
-              </div>
-
-              {/* Items listing table */}
-              <div className="space-y-2">
-                <div className="flex justify-between font-bold text-[10px]">
-                  <span className="w-1/2">ITEM NAME</span>
-                  <span className="w-1/6 text-right">QTY</span>
-                  <span className="w-1/6 text-right">RATE</span>
-                  <span className="w-1/6 text-right">AMT</span>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">CUSTOMER PHONE</label>
+                    <input
+                      type="tel"
+                      value={editBillForm.customerPhone || ""}
+                      onChange={(e) => setEditBillForm({ ...editBillForm, customerPhone: e.target.value })}
+                      className="w-full px-2 py-1.5 border rounded-lg text-xs bg-white text-slate-800"
+                    />
+                  </div>
                 </div>
-                <div className="border-b border-dashed border-gray-300"></div>
 
-                {selectedInvoice.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-[11px] leading-none">
-                    <span className="w-1/2 truncate font-semibold uppercase">{item.name}</span>
-                    <span className="w-1/6 text-right font-bold">{item.quantity}</span>
-                    <span className="w-1/6 text-right">{item.price}</span>
-                    <span className="w-1/6 text-right font-bold">
-                      {item.price * item.quantity}
+                <div className="border-t border-dashed my-2"></div>
+
+                <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                  <span className="text-[10px] font-bold text-gray-500 block">ITEMS LISTING</span>
+                  {editBillForm.items.map((item, idx) => (
+                    <div key={idx} className="space-y-1 bg-slate-50 p-2 rounded-lg text-left">
+                      <div className="font-extrabold uppercase text-slate-700 truncate">{item.name}</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] text-gray-400 block font-bold">QTY</label>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const q = parseInt(e.target.value) || 0;
+                              const updatedItems = [...editBillForm.items];
+                              updatedItems[idx] = { ...updatedItems[idx], quantity: q };
+                              setEditBillForm(recalculateInvoiceTotals({ ...editBillForm, items: updatedItems }));
+                            }}
+                            className="w-full px-2 py-1 border rounded bg-white text-slate-800 font-bold"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-gray-400 block font-bold">PRICE (₹)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.price}
+                            onChange={(e) => {
+                              const p = parseFloat(e.target.value) || 0;
+                              const updatedItems = [...editBillForm.items];
+                              updatedItems[idx] = { ...updatedItems[idx], price: p };
+                              setEditBillForm(recalculateInvoiceTotals({ ...editBillForm, items: updatedItems }));
+                            }}
+                            className="w-full px-2 py-1 border rounded bg-white text-slate-800 font-bold"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-dashed my-2"></div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">DISCOUNT (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editBillForm.discountAmount}
+                      onChange={(e) => {
+                        const d = parseFloat(e.target.value) || 0;
+                        setEditBillForm(recalculateInvoiceTotals({ ...editBillForm, discountAmount: d }));
+                      }}
+                      className="w-full px-2 py-1.5 border rounded-lg text-xs bg-white text-slate-800"
+                    />
+                  </div>
+                  <div className="text-right flex flex-col justify-end">
+                    <span className="text-[10px] text-gray-400 font-bold">RECALCULATED TOTAL:</span>
+                    <span className="text-sm font-black text-slate-900">₹{editBillForm.total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingBill(false);
+                      setEditBillForm(selectedInvoice);
+                    }}
+                    className="flex-1 py-2 text-center border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      editInvoice(editBillForm);
+                      setSelectedInvoice(editBillForm);
+                      setIsEditingBill(false);
+                    }}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg shadow-sm"
+                  >
+                    Save Bill
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Thermal container replicated */}
+                <div id="printable-receipt-card" className="bg-white text-black p-5 font-mono text-xs rounded-xl shadow-inner select-all border border-slate-300">
+                  {/* Receipt Header */}
+                  <div className="text-center space-y-1">
+                    <span className="font-extrabold text-sm tracking-wider block">
+                      *** {settings.shopName.toUpperCase()} ***
                     </span>
+                    <p className="text-[10px] leading-tight text-gray-600">
+                      {settings.address}
+                    </p>
+                    <p className="text-[10px] text-gray-600 leading-none">
+                      Phone: {settings.contactNumber}
+                    </p>
+                    {settings.gstNo && (
+                      <p className="text-[10px] text-gray-600 leading-none">
+                        GSTIN: {settings.gstNo}
+                      </p>
+                    )}
+                    <div className="border-t border-dashed border-black my-2"></div>
                   </div>
-                ))}
 
-                <div className="border-t border-dashed border-black my-2.5"></div>
-              </div>
+                  {/* Bill Details */}
+                  <div className="space-y-1 text-[10px]">
+                    <div className="flex justify-between">
+                      <span>Bill No: {selectedInvoice.billNo}</span>
+                      <span>Payment: {selectedInvoice.paymentMethod}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Reprint date: {new Date().toLocaleDateString()}</span>
+                      <span>Shift: A</span>
+                    </div>
+                    {selectedInvoice.customerName && (
+                      <div className="flex justify-between border-t border-dashed border-gray-100 pt-1 mt-1 font-bold">
+                        <span>Cust: {selectedInvoice.customerName}</span>
+                        <span>No: {selectedInvoice.customerPhone || "N/A"}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-dashed border-black my-2"></div>
+                  </div>
 
-              {/* Bill totals */}
-              <div className="space-y-1.5 text-right text-[11px]">
-                <div className="flex justify-between">
-                  <span>Subtotal Amount:</span>
-                  <span className="font-bold">
-                    {settings.currency} {selectedInvoice.subtotal.toFixed(2)}
-                  </span>
+                  {/* Items listing table */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between font-bold text-[10px]">
+                      <span className="w-1/2">ITEM NAME</span>
+                      <span className="w-1/6 text-right">QTY</span>
+                      <span className="w-1/6 text-right">RATE</span>
+                      <span className="w-1/6 text-right">AMT</span>
+                    </div>
+                    <div className="border-b border-dashed border-gray-300"></div>
+
+                    {selectedInvoice.items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between text-[11px] leading-none">
+                        <span className="w-1/2 truncate font-semibold uppercase">{item.name}</span>
+                        <span className="w-1/6 text-right font-bold">{item.quantity}</span>
+                        <span className="w-1/6 text-right">{item.price}</span>
+                        <span className="w-1/6 text-right font-bold">
+                          {item.price * item.quantity}
+                        </span>
+                      </div>
+                    ))}
+
+                    <div className="border-t border-dashed border-black my-2.5"></div>
+                  </div>
+
+                  {/* Bill totals */}
+                  <div className="space-y-1.5 text-right text-[11px]">
+                    <div className="flex justify-between">
+                      <span>Subtotal Amount:</span>
+                      <span className="font-bold">
+                        {settings.currency} {selectedInvoice.subtotal.toFixed(2)}
+                      </span>
+                    </div>
+                    {settings.taxEnabled && (
+                      <div className="flex justify-between text-[10px] text-gray-655">
+                        <span>CGST + SGST (Included):</span>
+                        <span>
+                          {settings.currency} {selectedInvoice.taxTotal.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {selectedInvoice.discountAmount > 0 && (
+                      <div className="flex justify-between text-emerald-700 font-bold">
+                        <span>Discount Coupon Applied:</span>
+                        <span>
+                          -{settings.currency} {selectedInvoice.discountAmount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="border-t border-dashed border-black my-1"></div>
+                    <div className="flex justify-between text-sm font-black text-black">
+                      <span>NET TOTAL COMPLETED:</span>
+                      <span>
+                        {settings.currency} {selectedInvoice.total.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Receipt thermal greeting footer */}
+                  <div className="text-center mt-5 space-y-1">
+                    <div className="border-t border-dashed border-black mb-2"></div>
+                    <p className="text-[10px] italic leading-tight">
+                      "{settings.footerMessage}"
+                    </p>
+                    <p className="text-[9px] font-bold text-gray-400">Reprint issued via system logs v2.6</p>
+                  </div>
                 </div>
-                {settings.taxEnabled && (
-                  <div className="flex justify-between text-[10px] text-gray-650">
-                    <span>CGST + SGST (Included):</span>
-                    <span>
-                      {settings.currency} {selectedInvoice.taxTotal.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                {selectedInvoice.discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-700 font-bold">
-                    <span>Discount Coupon Applied:</span>
-                    <span>
-                      -{settings.currency} {selectedInvoice.discountAmount.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                <div className="border-t border-dashed border-black my-1"></div>
-                <div className="flex justify-between text-sm font-black text-black">
-                  <span>NET TOTAL COMPLETED:</span>
-                  <span>
-                    {settings.currency} {selectedInvoice.total.toFixed(2)}
-                  </span>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      window.print();
+                    }}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 focus:outline-none transition-colors"
+                  >
+                    <Printer size={15} />
+                    Re-Print Thermal Copy
+                  </button>
+
+                  {["Admin", "Manager"].includes(session.role) && (
+                    <button
+                      onClick={() => {
+                        setEditBillForm(selectedInvoice);
+                        setIsEditingBill(true);
+                      }}
+                      className="flex-1 py-3 bg-slate-700 hover:bg-slate-650 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 focus:outline-none transition-colors"
+                    >
+                      <Edit2 size={13} />
+                      Edit Details
+                    </button>
+                  )}
                 </div>
-              </div>
-
-              {/* Receipt thermal greeting footer */}
-              <div className="text-center mt-5 space-y-1">
-                <div className="border-t border-dashed border-black mb-2"></div>
-                <p className="text-[10px] italic leading-tight">
-                  "{settings.footerMessage}"
-                </p>
-                <p className="text-[9px] font-bold text-gray-400">Reprint issued via system logs v2.6</p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                window.print();
-              }}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 focus:outline-none transition-colors"
-            >
-              <Printer size={15} />
-              Re-Print Thermal Copy
-            </button>
+              </>
+            )}
           </div>
         </div>
       )}

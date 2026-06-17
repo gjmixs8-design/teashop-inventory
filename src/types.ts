@@ -3,6 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface RecipeItem {
+  materialId: string;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -16,6 +21,7 @@ export interface Product {
   unit: string;
   taxPercent: number; // e.g. 5, 18, 0
   supplierId?: string;
+  recipe?: RecipeItem[];
 }
 
 export interface RawMaterial {
@@ -35,6 +41,7 @@ export interface Supplier {
   email: string;
   gstNo: string;
   address: string;
+  image?: string; // Base64 profile picture
 }
 
 export type ExpenseCategory =
@@ -68,6 +75,8 @@ export interface Employee {
   salaryAmount: number; // numeric amount per day/month
   active: boolean;
   avatarColor: string; // hex or tailwind text/bg combo
+  image?: string; // Base64 profile picture
+  email?: string;
 }
 
 export interface Attendance {
@@ -152,6 +161,7 @@ export interface ShopSettings {
   taxEnabled: boolean;
   currency: string; // e.g. "₹", "$", "€"
   thermalWidth: "58mm" | "80mm";
+  strictAuthMode?: boolean;
 }
 
 export type AppRole = "Admin" | "Manager" | "Cashier" | "Staff";

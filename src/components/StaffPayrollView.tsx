@@ -20,8 +20,13 @@ import {
   FileText,
   UserPlus,
   UserCheck,
+  Edit2,
+  Trash2,
+  Camera,
+  Upload,
 } from "lucide-react";
 import { Employee, Attendance, SalaryPayment } from "../types";
+import { uploadImageToStorage } from "../firebase";
 
 export default function StaffPayrollView() {
   const {
@@ -30,11 +35,14 @@ export default function StaffPayrollView() {
     salaryPayments,
     addEmployee,
     editEmployee,
+    deleteEmployee,
     markAttendance,
     addSalaryPayment,
     settings,
     session,
   } = useApp();
+
+  const [imageUploading, setImageUploading] = useState(false);
 
   const [activeSubTab, setActiveSubTab] = useState<"attendance" | "payroll" | "employees">("attendance");
   const todayStr = "2026-06-10";
@@ -48,7 +56,72 @@ export default function StaffPayrollView() {
     shift: "Morning" as Employee["shift"],
     salaryType: "daily" as Employee["salaryType"],
     salaryAmount: "",
+    image: undefined as string | undefined,
   });
+
+  const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
+  const [showEditEmp, setShowEditEmp] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageUploading(true);
+      try {
+        const url = await uploadImageToStorage("employees", file.name, file);
+        if (isEdit) {
+          setEditingEmp(prev => prev ? { ...prev, image: url } : null);
+        } else {
+          setEmpForm(prev => ({ ...prev, image: url }));
+        }
+      } catch (err) {
+        console.error("Employee image upload failed:", err);
+        alert("Image upload failed.");
+      } finally {
+        setImageUploading(false);
+      }
+    }
+  };
+
+  const handleRemovePhoto = (isEdit: boolean) => {
+    if (isEdit) {
+      setEditingEmp(prev => prev ? { ...prev, image: undefined } : null);
+    } else {
+      setEmpForm(prev => ({ ...prev, image: undefined }));
+    }
+  };
+
+  const handleEditEmployeeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEmp) return;
+
+    const trimmedName = editingEmp.name.trim();
+    const contactNum = editingEmp.contact.trim();
+    const amountVal = Number(editingEmp.salaryAmount);
+
+    if (trimmedName.length < 2) {
+      alert("Validation Error: Name must be at least 2 characters long.");
+      return;
+    }
+
+    if (!/^[0-9]{10}$/.test(contactNum)) {
+      alert("Validation Error: Mobile phone number must be exactly 10 digits.");
+      return;
+    }
+
+    if (isNaN(amountVal) || amountVal <= 0) {
+      alert("Validation Error: Stipend pay rate must be a positive number.");
+      return;
+    }
+
+    editEmployee({
+      ...editingEmp,
+      name: trimmedName,
+      contact: contactNum,
+      salaryAmount: amountVal,
+    });
+    setShowEditEmp(false);
+    setEditingEmp(null);
+  };
 
   // Salary processing state
   const [processingEmp, setProcessingEmp] = useState<Employee | null>(null);
@@ -72,15 +145,35 @@ export default function StaffPayrollView() {
       return;
     }
 
+    const trimmedName = empForm.name.trim();
+    const contactNum = empForm.contact.trim();
+    const amountVal = parseFloat(empForm.salaryAmount);
+
+    if (trimmedName.length < 2) {
+      alert("Validation Error: Name must be at least 2 characters long.");
+      return;
+    }
+
+    if (!/^[0-9]{10}$/.test(contactNum)) {
+      alert("Validation Error: Mobile phone number must be exactly 10 digits.");
+      return;
+    }
+
+    if (isNaN(amountVal) || amountVal <= 0) {
+      alert("Validation Error: Stipend pay rate must be a positive number.");
+      return;
+    }
+
     addEmployee({
-      name: empForm.name,
-      contact: empForm.contact,
+      name: trimmedName,
+      contact: contactNum,
       designation: empForm.designation,
       shift: empForm.shift,
       salaryType: empForm.salaryType,
-      salaryAmount: parseFloat(empForm.salaryAmount),
+      salaryAmount: amountVal,
       active: true,
       avatarColor: "bg-teal-500", // Will be auto-assigned in AppContext
+      image: empForm.image,
     });
 
     setEmpForm({
@@ -90,6 +183,7 @@ export default function StaffPayrollView() {
       shift: "Morning",
       salaryType: "daily",
       salaryAmount: "",
+      image: undefined,
     });
     setShowAddEmp(false);
   };
@@ -103,10 +197,28 @@ export default function StaffPayrollView() {
       return;
     }
 
-    const base = parseFloat(salaryForm.baseSalary) || 0;
-    const deduction = parseFloat(salaryForm.advanceDeduction) || 0;
-    const bonus = parseFloat(salaryForm.bonus) || 0;
+    const base = parseFloat(salaryForm.baseSalary);
+    const deduction = parseFloat(salaryForm.advanceDeduction);
+    const bonus = parseFloat(salaryForm.bonus);
+
+    if (isNaN(base) || base < 0) {
+      alert("Validation Error: Base Wages must be a non-negative number.");
+      return;
+    }
+    if (isNaN(deduction) || deduction < 0) {
+      alert("Validation Error: Deducted advances must be a non-negative number.");
+      return;
+    }
+    if (isNaN(bonus) || bonus < 0) {
+      alert("Validation Error: Bonus wage must be a non-negative number.");
+      return;
+    }
+
     const net = base + bonus - deduction;
+    if (net < 0) {
+      alert("Validation Error: Net wages paid cannot be negative. Please adjust base/bonus/deductions.");
+      return;
+    }
 
     addSalaryPayment({
       employeeId: processingEmp.id,
@@ -210,8 +322,14 @@ export default function StaffPayrollView() {
               return (
                 <div key={emp.id} className="bg-white p-4 rounded-2xl border border-gray-150 shadow-xs space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className={`h-11 w-11 ${emp.avatarColor || "bg-indigo-500"} text-white font-extrabold text-sm rounded-xl flex items-center justify-center`}>
-                      {emp.name.split(" ").map((n) => n[0]).join("")}
+                    <div className="h-11 w-11 rounded-xl overflow-hidden shrink-0 border border-slate-200">
+                      {emp.image ? (
+                        <img src={emp.image} alt={emp.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className={`w-full h-full ${emp.avatarColor || "bg-indigo-500"} text-white font-extrabold text-sm flex items-center justify-center`}>
+                          {emp.name.split(" ").map((n) => n[0]).join("")}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <h4 className="font-extrabold text-slate-800 text-sm sm:text-base leading-none">{emp.name}</h4>
@@ -536,17 +654,46 @@ export default function StaffPayrollView() {
             {employees.map((emp) => (
               <div key={emp.id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className={`h-10 w-10 rounded-xl ${emp.avatarColor} text-white font-black flex items-center justify-center text-xs shrink-0 shadow-sm`}>
-                    {emp.name.split(" ").map((n) => n[0]).join("")}
+                  <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0 border border-slate-200">
+                    {emp.image ? (
+                      <img src={emp.image} alt={emp.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className={`w-full h-full ${emp.avatarColor} text-white font-black flex items-center justify-center text-xs`}>
+                        {emp.name.split(" ").map((n) => n[0]).join("")}
+                      </div>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex justify-between items-center">
                       <span className="font-extrabold text-slate-800 text-sm truncate">{emp.name}</span>
-                      <span className={`inline-block px-1.5 py-0.5 font-bold rounded text-[9px] ${
-                        emp.active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
-                      }`}>
-                        {emp.active ? "Active" : "Leaved"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block px-1.5 py-0.5 font-bold rounded text-[9px] ${
+                          emp.active ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {emp.active ? "Active" : "Leaved"}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setEditingEmp(emp);
+                            setShowEditEmp(true);
+                          }}
+                          className="p-1 hover:bg-slate-100 text-slate-500 rounded-md"
+                          title="Edit"
+                        >
+                          <Edit2 size={11} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete ${emp.name}?`)) {
+                              deleteEmployee(emp.id);
+                            }
+                          }}
+                          className="p-1 hover:bg-rose-50 text-rose-500 rounded-md"
+                          title="Delete"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-gray-400 font-bold">
                       <span>{emp.designation}</span>
@@ -575,14 +722,21 @@ export default function StaffPayrollView() {
                   <th className="py-3 px-4">Active Shift timing</th>
                   <th className="py-3 px-4">Base Salary setting</th>
                   <th className="py-3 px-4">Shop Status</th>
+                  <th className="py-3 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {employees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-4 font-extrabold text-slate-800 flex items-center gap-2.5">
-                      <div className={`h-8 w-8 rounded-lg ${emp.avatarColor} text-white font-black flex items-center justify-center text-[10px]`}>
-                        {emp.name.split(" ").map((n) => n[0]).join("")}
+                      <div className="h-8 w-8 rounded-lg overflow-hidden shrink-0 border border-slate-200">
+                        {emp.image ? (
+                          <img src={emp.image} alt={emp.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className={`w-full h-full ${emp.avatarColor} text-white font-black flex items-center justify-center text-[10px]`}>
+                            {emp.name.split(" ").map((n) => n[0]).join("")}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <div className="font-extrabold">{emp.name}</div>
@@ -605,6 +759,31 @@ export default function StaffPayrollView() {
                       }`}>
                         {emp.active ? "Active Staff" : "Leaved"}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="inline-flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingEmp(emp);
+                            setShowEditEmp(true);
+                          }}
+                          className="p-1 hover:bg-slate-100 text-slate-500 hover:text-indigo-600 rounded-md transition-colors"
+                          title="Edit Employee"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete ${emp.name}?`)) {
+                              deleteEmployee(emp.id);
+                            }
+                          }}
+                          className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-md transition-colors"
+                          title="Delete Employee"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -712,6 +891,45 @@ export default function StaffPayrollView() {
                   </select>
                 </div>
               </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">PROFILE PHOTO</label>
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center bg-slate-50 shrink-0">
+                    {empForm.image ? (
+                      <img src={empForm.image} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera size={18} className="text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 flex gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="emp-photo-input"
+                      className="hidden"
+                      onChange={(e) => handleImageUpload(e, false)}
+                    />
+                    <label
+                      htmlFor="emp-photo-input"
+                      className={`px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 text-slate-700 dark:text-slate-200 text-[10px] font-bold rounded-lg cursor-pointer flex items-center gap-1 transition-all ${
+                        imageUploading ? "opacity-50 pointer-events-none" : "hover:bg-slate-200"
+                      }`}
+                    >
+                      <Upload size={12} /> {imageUploading ? "Uploading..." : "Choose File"}
+                    </label>
+                    {empForm.image && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(false)}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <button
@@ -719,6 +937,171 @@ export default function StaffPayrollView() {
               className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-colors"
             >
               Confirm and Issue ID Card
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* EDIT MEMBER MODAL */}
+      {showEditEmp && editingEmp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-40">
+          <form
+            onSubmit={handleEditEmployeeSubmit}
+            className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b pb-2">
+              <h4 className="text-base font-extrabold text-slate-800 font-sans">Edit Staff member</h4>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditEmp(false);
+                  setEditingEmp(null);
+                }}
+                className="text-gray-400 hover:text-gray-650 focus:outline-none"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">FULL NAME</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Anand Gowda"
+                  value={editingEmp.name}
+                  onChange={(e) => setEditingEmp({ ...editingEmp, name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs font-bold focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">MOBILE PHONE (10 DIGITS)</label>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="e.g. 9812345678"
+                  value={editingEmp.contact}
+                  onChange={(e) => setEditingEmp({ ...editingEmp, contact: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-xl text-xs font-mono focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">DESIGNATION</label>
+                  <select
+                    value={editingEmp.designation}
+                    onChange={(e) => setEditingEmp({ ...editingEmp, designation: e.target.value as Employee["designation"] })}
+                    className="w-full p-2 border rounded-xl text-xs font-bold focus:outline-none"
+                  >
+                    <option value="Chef">Chef (Barista)</option>
+                    <option value="Cashier">Cashier Counter</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Staff">Helper / Staff</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">SHIFT TIMINGS</label>
+                  <select
+                    value={editingEmp.shift}
+                    onChange={(e) => setEditingEmp({ ...editingEmp, shift: e.target.value as Employee["shift"] })}
+                    className="w-full p-2 border rounded-xl text-xs font-bold"
+                  >
+                    <option value="Morning">Morning Shift</option>
+                    <option value="Evening">Evening Shift</option>
+                    <option value="Full Day">Full Day Shift</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">STIPEND PAY RATE (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 15000"
+                    value={editingEmp.salaryAmount}
+                    onChange={(e) => setEditingEmp({ ...editingEmp, salaryAmount: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border rounded-xl text-xs font-bold"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">STIPEND SCHEDULE</label>
+                  <select
+                    value={editingEmp.salaryType}
+                    onChange={(e) => setEditingEmp({ ...editingEmp, salaryType: e.target.value as Employee["salaryType"] })}
+                    className="w-full p-2 border rounded-xl text-xs font-bold"
+                  >
+                    <option value="daily">Daily Wage worker</option>
+                    <option value="monthly">Monthly salaried</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="checkbox"
+                  id="edit-emp-active"
+                  checked={editingEmp.active}
+                  onChange={(e) => setEditingEmp({ ...editingEmp, active: e.target.checked })}
+                  className="rounded text-indigo-600 focus:ring-indigo-550 h-4 w-4 bg-white"
+                />
+                <label htmlFor="edit-emp-active" className="text-xs font-bold text-slate-800 cursor-pointer">
+                  Currently Employed (Active Staff)
+                </label>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1">PROFILE PHOTO</label>
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center bg-slate-50 shrink-0">
+                    {editingEmp.image ? (
+                      <img src={editingEmp.image} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera size={18} className="text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 flex gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="edit-emp-photo-input"
+                      className="hidden"
+                      onChange={(e) => handleImageUpload(e, true)}
+                    />
+                    <label
+                      htmlFor="edit-emp-photo-input"
+                      className={`px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 text-slate-700 dark:text-slate-200 text-[10px] font-bold rounded-lg cursor-pointer flex items-center gap-1 transition-all ${
+                        imageUploading ? "opacity-50 pointer-events-none" : "hover:bg-slate-200"
+                      }`}
+                    >
+                      <Upload size={12} /> {imageUploading ? "Uploading..." : "Choose File"}
+                    </label>
+                    {editingEmp.image && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(true)}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 text-[10px] font-bold rounded-lg transition-all"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-colors"
+            >
+              Save Details
             </button>
           </form>
         </div>
@@ -741,7 +1124,7 @@ export default function StaffPayrollView() {
               <div className="border-t border-dashed border-slate-650 my-2"></div>
             </div>
 
-            <div className="bg-white text-black p-4 font-mono text-[11px] rounded-lg space-y-3">
+            <div id="printable-receipt-card" className="bg-white text-black p-4 font-mono text-[11px] rounded-lg space-y-3">
               <div className="text-center font-extrabold">WAGE SLIP COMPLIANCE</div>
               <p>ID: {selectedPayslip.id}</p>
               <p>Period: <b>{selectedPayslip.payPeriod}</b></p>

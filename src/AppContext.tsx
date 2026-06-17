@@ -32,6 +32,21 @@ import {
   initialStockMovementLogs,
   defaultShopSettings,
 } from "./initialData";
+import { 
+  syncCollection, 
+  writeDocument, 
+  deleteDocument, 
+  incrementCounter, 
+  adjustStockTransaction,
+  auth,
+  isFirebaseConfigured
+} from "./firebase";
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged, 
+  User as FirebaseUser 
+} from "firebase/auth";
 
 interface AppContextType {
   products: Product[];
@@ -46,6 +61,12 @@ interface AppContextType {
   stockMovementLogs: StockMovementLog[];
   session: UserSession;
   setSession: (session: UserSession) => void;
+
+  // Authentication
+  firebaseUser: FirebaseUser | null;
+  authLoading: boolean;
+  loginUser: (email: string, password: string) => Promise<void>;
+  logoutUser: () => Promise<void>;
 
   // Actions
   addProduct: (p: Omit<Product, "id">) => void;
@@ -65,6 +86,7 @@ interface AppContextType {
 
   addEmployee: (emp: Omit<Employee, "id">) => void;
   editEmployee: (emp: Employee) => void;
+  deleteEmployee: (id: string) => void;
 
   markAttendance: (empId: string, status: Attendance["status"], checkIn?: string, checkOut?: string) => void;
   addSalaryPayment: (pay: Omit<SalaryPayment, "id">) => void;
@@ -76,8 +98,10 @@ interface AppContextType {
     customerName?: string,
     customerPhone?: string,
     splitTotals?: { cash: number; upi: number; card: number }
-  ) => Invoice;
+  ) => Promise<Invoice>;
   refundInvoice: (id: string) => void;
+  deleteInvoice: (id: string) => void;
+  editInvoice: (inv: Invoice) => void;
 
   updateSettings: (settings: ShopSettings) => void;
   recordStockMovement: (itemId: string, itemType: "Product" | "Material", quantity: number, type: StockMovementLog["type"], notes?: string) => void;
@@ -86,171 +110,159 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load initial states from localStorage if they exist, otherwise initialize them
-  const [products, setProducts] = useState<Product[]>(() => {
-    const local = localStorage.getItem("tea_products");
-    if (local) {
-      const parsed: Product[] = JSON.parse(local);
-      return parsed.map((p) => {
-        const matchingInit = initialProducts.find((ip) => ip.id === p.id);
-        if (matchingInit) {
-          return {
-            ...p,
-            image: p.image || matchingInit.image, // Force recover image if absent or empty
-            category: p.category || matchingInit.category,
-          };
-        }
-        return p;
-      });
-    }
-    return initialProducts;
-  });
+  const [products, setProducts] = useState<Product[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [settings, setSettings] = useState<ShopSettings>(defaultShopSettings);
+  const [stockMovementLogs, setStockMovementLogs] = useState<StockMovementLog[]>([]);
 
-  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(() => {
-    const local = localStorage.getItem("tea_raw_materials");
-    return local ? JSON.parse(local) : initialRawMaterials;
-  });
-
-  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
-    const local = localStorage.getItem("tea_suppliers");
-    return local ? JSON.parse(local) : initialSuppliers;
-  });
-
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const local = localStorage.getItem("tea_expenses");
-    return local ? JSON.parse(local) : initialExpenses;
-  });
-
-  const [employees, setEmployees] = useState<Employee[]>(() => {
-    const local = localStorage.getItem("tea_employees");
-    return local ? JSON.parse(local) : initialEmployees;
-  });
-
-  const [attendance, setAttendance] = useState<Attendance[]>(() => {
-    const local = localStorage.getItem("tea_attendance");
-    return local ? JSON.parse(local) : initialAttendance;
-  });
-
-  const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>(() => {
-    const local = localStorage.getItem("tea_salary_payments");
-    return local ? JSON.parse(local) : initialSalaryPayments;
-  });
-
-  const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    const local = localStorage.getItem("tea_invoices");
-    return local ? JSON.parse(local) : initialInvoices;
-  });
-
-  const [settings, setSettings] = useState<ShopSettings>(() => {
-    const local = localStorage.getItem("tea_settings");
-    if (local) {
-      const parsed = JSON.parse(local);
-      return {
-        ...defaultShopSettings,
-        ...parsed,
-        logoUrl: parsed.logoUrl || defaultShopSettings.logoUrl,
-      };
-    }
-    return defaultShopSettings;
-  });
-
-  const [stockMovementLogs, setStockMovementLogs] = useState<StockMovementLog[]>(() => {
-    const local = localStorage.getItem("tea_stock_logs");
-    return local ? JSON.parse(local) : initialStockMovementLogs;
-  });
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
 
   const [session, setSessionState] = useState<UserSession>(() => {
     const local = localStorage.getItem("tea_session");
     return local ? JSON.parse(local) : { role: "Admin", userName: "Ravi Kumar (Owner)", userId: "emp-4" };
   });
 
-  // Save states to localStorage when they change with safety wrappers
+  // Real-time Firestore synchronization listeners
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_products", JSON.stringify(products));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [products]);
+    return syncCollection("products", setProducts, initialProducts);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_raw_materials", JSON.stringify(rawMaterials));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [rawMaterials]);
+    return syncCollection("raw_materials", setRawMaterials, initialRawMaterials);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_suppliers", JSON.stringify(suppliers));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [suppliers]);
+    return syncCollection("suppliers", setSuppliers, initialSuppliers);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_expenses", JSON.stringify(expenses));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [expenses]);
+    return syncCollection("expenses", setExpenses, initialExpenses);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_employees", JSON.stringify(employees));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [employees]);
+    return syncCollection("employees", setEmployees, initialEmployees);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_attendance", JSON.stringify(attendance));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [attendance]);
+    return syncCollection("attendance", setAttendance, initialAttendance);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_salary_payments", JSON.stringify(salaryPayments));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [salaryPayments]);
+    return syncCollection("salary_payments", setSalaryPayments, initialSalaryPayments);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_invoices", JSON.stringify(invoices));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [invoices]);
+    return syncCollection("invoices", setInvoices, initialInvoices);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_settings", JSON.stringify(settings));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
-    }
-  }, [settings]);
+    return syncCollection("settings", (data) => {
+      if (data && data.length > 0) {
+        const found = data.find((d) => d.id === "current") || data[0];
+        if (found) {
+          const { id, ...rest } = found;
+          setSettings(rest as ShopSettings);
+        }
+      }
+    }, [{ ...defaultShopSettings, id: "current" }]);
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("tea_stock_logs", JSON.stringify(stockMovementLogs));
-    } catch (e) {
-      console.warn("Storage item write blocked:", e);
+    return syncCollection("stock_logs", setStockMovementLogs, initialStockMovementLogs);
+  }, []);
+
+  // Monitor Firebase Auth User State
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
+      setAuthLoading(false);
+      return;
     }
-  }, [stockMovementLogs]);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setAuthLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Sync auth state to active session when Strict Auth Mode is active
+  useEffect(() => {
+    if (!settings.strictAuthMode) {
+      // Demo / simulation mode leaves the session alone
+      return;
+    }
+
+    if (authLoading) return;
+
+    if (firebaseUser && firebaseUser.email) {
+      const matchedEmp = employees.find((emp) => emp.email === firebaseUser.email);
+      if (matchedEmp) {
+        setSessionState({
+          role: matchedEmp.designation === "Chef" ? "Staff" : (matchedEmp.designation === "Manager" ? "Manager" : (matchedEmp.designation === "Cashier" ? "Cashier" : "Admin")),
+          userName: matchedEmp.name,
+          userId: matchedEmp.id,
+        });
+      } else {
+        setSessionState({
+          role: "Admin",
+          userName: firebaseUser.email,
+          userId: "firebase-admin",
+        });
+      }
+    } else {
+      setSessionState({
+        role: "Staff",
+        userName: "Guest Cashier",
+        userId: "guest",
+      });
+    }
+  }, [firebaseUser, employees, settings.strictAuthMode, authLoading]);
 
   const setSession = (sess: UserSession) => {
+    // Prevent manual simulation role override when in strict server auth mode
+    if (settings.strictAuthMode) {
+      console.warn("Cannot manually set session when strict server auth mode is enabled.");
+      return;
+    }
     setSessionState(sess);
     try {
       localStorage.setItem("tea_session", JSON.stringify(sess));
     } catch (e) {
       console.warn("Session storage write blocked:", e);
+    }
+  };
+
+  const loginUser = async (email: string, password: string) => {
+    if (isFirebaseConfigured && auth) {
+      setAuthLoading(true);
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (err: any) {
+        setAuthLoading(false);
+        throw new Error(err.message || "Authentication failed");
+      }
+    } else {
+      throw new Error("Firebase Authentication is not configured.");
+    }
+  };
+
+  const logoutUser = async () => {
+    if (isFirebaseConfigured && auth) {
+      setAuthLoading(true);
+      try {
+        await signOut(auth);
+      } catch (err: any) {
+        setAuthLoading(false);
+        throw new Error(err.message || "Logout failed");
+      }
     }
   };
 
@@ -267,154 +279,147 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? products.find((p) => p.id === itemId)?.name || "Unknown Product"
         : rawMaterials.find((r) => r.id === itemId)?.name || "Unknown Material";
 
+    const logId = `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const newLog: StockMovementLog = {
-      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: logId,
       itemId,
       itemName,
       itemType,
       quantity,
       type,
       date: new Date().toISOString().replace("T", " ").substring(0, 16),
-      notes,
+      notes: notes || "",
     };
-    setStockMovementLogs((prev) => [newLog, ...prev]);
+    writeDocument("stock_logs", logId, newLog);
   };
 
   // Product Actions
   const addProduct = (p: Omit<Product, "id">) => {
     const newId = `prod-${Date.now()}`;
     const newProduct: Product = { ...p, id: newId };
-    setProducts((prev) => [...prev, newProduct]);
+    writeDocument("products", newId, newProduct);
     recordStockMovement(newId, "Product", p.stock, "Adjustment", "Initial stock setup");
   };
 
   const editProduct = (p: Product) => {
-    setProducts((prev) => {
-      const old = prev.find((item) => item.id === p.id);
-      if (old && old.stock !== p.stock) {
-        const diff = p.stock - old.stock;
-        recordStockMovement(p.id, "Product", diff, "Adjustment", "Manual inventory stock update");
-      }
-      return prev.map((item) => (item.id === p.id ? p : item));
-    });
+    const old = products.find((item) => item.id === p.id);
+    if (old && old.stock !== p.stock) {
+      const diff = p.stock - old.stock;
+      recordStockMovement(p.id, "Product", diff, "Adjustment", "Manual inventory stock update");
+    }
+    writeDocument("products", p.id, p);
   };
 
   const deleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((item) => item.id !== id));
+    deleteDocument("products", id);
   };
 
   // Raw Material Actions
   const addRawMaterial = (r: Omit<RawMaterial, "id">) => {
     const newId = `raw-${Date.now()}`;
     const newRaw: RawMaterial = { ...r, id: newId };
-    setRawMaterials((prev) => [...prev, newRaw]);
+    writeDocument("raw_materials", newId, newRaw);
     recordStockMovement(newId, "Material", r.stock, "Adjustment", "Initial raw material stock setup");
   };
 
   const editRawMaterial = (r: RawMaterial) => {
-    setRawMaterials((prev) => {
-      const old = prev.find((item) => item.id === r.id);
-      if (old && old.stock !== r.stock) {
-        const diff = r.stock - old.stock;
-        recordStockMovement(r.id, "Material", diff, "Adjustment", "Manual material stock count adjust");
-      }
-      return prev.map((item) => (item.id === r.id ? r : item));
-    });
+    const old = rawMaterials.find((item) => item.id === r.id);
+    if (old && old.stock !== r.stock) {
+      const diff = r.stock - old.stock;
+      recordStockMovement(r.id, "Material", diff, "Adjustment", "Manual material stock count adjust");
+    }
+    writeDocument("raw_materials", r.id, r);
   };
 
   const deleteRawMaterial = (id: string) => {
-    setRawMaterials((prev) => prev.filter((item) => item.id !== id));
+    deleteDocument("raw_materials", id);
   };
 
   // Supplier Actions
   const addSupplier = (s: Omit<Supplier, "id">) => {
-    const newSupplier: Supplier = { ...s, id: `sup-${Date.now()}` };
-    setSuppliers((prev) => [...prev, newSupplier]);
+    const newId = `sup-${Date.now()}`;
+    writeDocument("suppliers", newId, { ...s, id: newId });
   };
 
   const editSupplier = (s: Supplier) => {
-    setSuppliers((prev) => prev.map((item) => (item.id === s.id ? s : item)));
+    writeDocument("suppliers", s.id, s);
   };
 
   const deleteSupplier = (id: string) => {
-    setSuppliers((prev) => prev.filter((item) => item.id !== id));
+    deleteDocument("suppliers", id);
   };
 
   // Expense Actions
   const addExpense = (e: Omit<Expense, "id">) => {
-    const newExpense: Expense = { ...e, id: `exp-${Date.now()}` };
-    setExpenses((prev) => [newExpense, ...prev]);
-
-    // If expense is on Milk & Ingredients, let's log this as supportive note (no auto-update raw stock unless specified)
+    const newId = `exp-${Date.now()}`;
+    writeDocument("expenses", newId, { ...e, id: newId });
   };
 
   const deleteExpense = (id: string) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    deleteDocument("expenses", id);
   };
 
   // Employee Actions
   const addEmployee = (emp: Omit<Employee, "id">) => {
     const colors = ["bg-teal-500", "bg-purple-500", "bg-amber-500", "bg-rose-500", "bg-indigo-500", "bg-emerald-500"];
     const col = colors[Math.floor(Math.random() * colors.length)];
-    const newEmp: Employee = { ...emp, id: `emp-${Date.now()}`, avatarColor: col };
-    setEmployees((prev) => [...prev, newEmp]);
+    const newId = `emp-${Date.now()}`;
+    writeDocument("employees", newId, { ...emp, id: newId, avatarColor: col });
   };
 
   const editEmployee = (emp: Employee) => {
-    setEmployees((prev) => prev.map((e) => (e.id === emp.id ? emp : e)));
+    writeDocument("employees", emp.id, emp);
+  };
+
+  const deleteEmployee = (id: string) => {
+    deleteDocument("employees", id);
   };
 
   // Attendance Actions
   const markAttendance = (empId: string, status: Attendance["status"], checkIn?: string, checkOut?: string) => {
     const todayStr = new Date().toISOString().split("T")[0];
     const key = `${empId}_${todayStr}`;
+    const existing = attendance.find((a) => a.id === key);
 
-    setAttendance((prev) => {
-      const existing = prev.find((a) => a.id === key);
-      if (existing) {
-        return prev.map((a) =>
-          a.id === key
-            ? {
-                ...a,
-                status,
-                checkIn: checkIn !== undefined ? checkIn : a.checkIn,
-                checkOut: checkOut !== undefined ? checkOut : a.checkOut,
-              }
-            : a
-        );
-      } else {
-        const checkInTime = checkIn || new Date().toTimeString().slice(0, 5);
-        return [
-          {
-            id: key,
-            employeeId: empId,
-            date: todayStr,
-            status,
-            checkIn: status === "Present" || status === "Half Day" ? checkInTime : undefined,
-            checkOut: checkOut || undefined,
-          },
-          ...prev,
-        ];
-      }
-    });
+    if (existing) {
+      const updated = {
+        ...existing,
+        status,
+        checkIn: checkIn !== undefined ? checkIn : existing.checkIn,
+        checkOut: checkOut !== undefined ? checkOut : existing.checkOut,
+      };
+      writeDocument("attendance", key, updated);
+    } else {
+      const checkInTime = checkIn || new Date().toTimeString().slice(0, 5);
+      const newAttendance: Attendance = {
+        id: key,
+        employeeId: empId,
+        date: todayStr,
+        status,
+        checkIn: status === "Present" || status === "Half Day" ? checkInTime : undefined,
+        checkOut: checkOut || undefined,
+      };
+      writeDocument("attendance", key, newAttendance);
+    }
   };
 
   // Salary Payroll Payments
   const addSalaryPayment = (pay: Omit<SalaryPayment, "id">) => {
-    const newPay: SalaryPayment = { ...pay, id: `sal-${Date.now()}` };
-    setSalaryPayments((prev) => [newPay, ...prev]);
+    const newId = `sal-${Date.now()}`;
+    writeDocument("salary_payments", newId, { ...pay, id: newId });
   };
 
   // Invoice / POS Invoice creation
-  const createInvoice = (
+  const createInvoice = async (
     items: CartItem[],
     discount: number,
     paymentMethod: Invoice["paymentMethod"],
     customerName: string = "",
     customerPhone: string = "",
     splitTotals?: { cash: number; upi: number; card: number }
-  ): Invoice => {
-    const nextBillIndex = invoices.length + 12057; // Start increment from our pre-populated mock starting base
+  ): Promise<Invoice> => {
+    const counterIndex = await incrementCounter("metadata/invoice_counter");
+    const nextBillIndex = counterIndex + 12057;
     const billNo = `CH-${nextBillIndex}`;
 
     let subtotalTotal = 0;
@@ -427,8 +432,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const totalItemPrice = product.sellingPrice * quantity;
       itemsPriceSum += totalItemPrice;
 
-      // Extract tax (inclusive pricing)
-      // TaxAmount = (Price * TaxPercent) / (100 + TaxPercent)
       const taxPercent = settings.taxEnabled ? product.taxPercent : 0;
       const taxAmount = (totalItemPrice * taxPercent) / (100 + taxPercent);
       const subtotalVal = totalItemPrice - taxAmount;
@@ -436,7 +439,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subtotalTotal += subtotalVal;
       taxTotalAmount += taxAmount;
 
-      // Profit calculation: (SellPrice - PurchasePrice) * Quantity
       const profitVal = (product.sellingPrice - product.purchasePrice) * quantity;
       profitAmount += profitVal;
 
@@ -453,7 +455,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const totalBeforeDiscount = itemsPriceSum;
     const finalTotal = Math.max(0, totalBeforeDiscount - discount);
 
-    // Proportionally adjust profit and tax for discounts
     const discountRatio = totalBeforeDiscount > 0 ? finalTotal / totalBeforeDiscount : 1;
     const adjustedProfit = Number((profitAmount * discountRatio).toFixed(2));
 
@@ -475,25 +476,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cashierName: session.userName,
     };
 
-    // Deduct stock of items sold
-    setProducts((prev) =>
-      prev.map((p) => {
-        const itemSold = items.find((cart) => cart.product.id === p.id);
-        if (itemSold) {
-          const newStock = Math.max(0, p.stock - itemSold.quantity);
-          // Auto record movement log
-          return { ...p, stock: newStock };
+    // Deduct stock of items sold and recipe raw materials atomically
+    for (const cart of items) {
+      const { product, quantity } = cart;
+      
+      // 1. Atomically adjust product stock
+      await adjustStockTransaction("products", product.id, -quantity);
+      
+      // 2. Atomically adjust raw materials stock if recipe/BOM exists
+      if (product.recipe && product.recipe.length > 0) {
+        for (const rItem of product.recipe) {
+          const deduction = rItem.quantity * quantity;
+          await adjustStockTransaction("raw_materials", rItem.materialId, -deduction);
+          
+          // Log raw material stock decrement
+          const matObj = rawMaterials.find((m) => m.id === rItem.materialId);
+          const logId = `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+          const newLog: StockMovementLog = {
+            id: logId,
+            itemId: rItem.materialId,
+            itemName: matObj?.name || "Unknown Material",
+            itemType: "Material",
+            quantity: -deduction,
+            type: "Sale",
+            date: new Date().toISOString().replace("T", " ").substring(0, 16),
+            notes: `BOM decrease for sale of ${product.name} (x${quantity}) in bill #${billNo}`,
+          };
+          writeDocument("stock_logs", logId, newLog);
         }
-        return p;
-      })
-    );
+      }
+    }
 
     // Record stock logs for items sold
     items.forEach((cart) => {
       recordStockMovement(cart.product.id, "Product", -cart.quantity, "Sale", `Order billing #${billNo}`);
     });
 
-    setInvoices((prev) => [newInvoice, ...prev]);
+    writeDocument("invoices", newInvoice.id, newInvoice);
 
     return newInvoice;
   };
@@ -503,29 +522,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!inv) return;
 
     // Refund / return items to stock
-    setProducts((prev) =>
-      prev.map((p) => {
-        const refundItem = inv.items.find((item) => item.productId === p.id);
-        if (refundItem) {
-          return { ...p, stock: p.stock + refundItem.quantity };
-        }
-        return p;
-      })
-    );
+    inv.items.forEach((item) => {
+      const p = products.find((prod) => prod.id === item.productId);
+      if (p) {
+        writeDocument("products", p.id, { ...p, stock: p.stock + item.quantity });
+      }
+    });
 
     // Record logs
     inv.items.forEach((item) => {
       recordStockMovement(item.productId, "Product", item.quantity, "Adjustment", `Refund/Return of bill #${inv.billNo}`);
     });
 
-    // Remove or flag invoice as refunded. Let's delete or edit it. Let's filter it out or keep items but flag total as 0.
-    // Filtering it out for simplicity in current reports, or we can deduct total sales. Let's just filter it out for clean metrics.
-    setInvoices((prev) => prev.filter((invoice) => invoice.id !== id));
+    deleteDocument("invoices", id);
+  };
+
+  const deleteInvoice = (id: string) => {
+    deleteDocument("invoices", id);
+  };
+
+  const editInvoice = (inv: Invoice) => {
+    writeDocument("invoices", inv.id, inv);
   };
 
   // Update Settings
   const updateSettings = (newSettings: ShopSettings) => {
-    setSettings(newSettings);
+    writeDocument("settings", "current", { ...newSettings, id: "current" });
   };
 
   return (
@@ -543,6 +565,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         stockMovementLogs,
         session,
         setSession,
+        firebaseUser,
+        authLoading,
+        loginUser,
+        logoutUser,
         addProduct,
         editProduct,
         deleteProduct,
@@ -556,10 +582,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteExpense,
         addEmployee,
         editEmployee,
+        deleteEmployee,
         markAttendance,
         addSalaryPayment,
         createInvoice,
         refundInvoice,
+        deleteInvoice,
+        editInvoice,
         updateSettings,
         recordStockMovement,
       }}

@@ -1,0 +1,49 @@
+{
+  "rules": {
+    "settings": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('employees').child(auth.uid).child('designation').val() === 'Admin'"
+    },
+    "products": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('employees').child(auth.uid).child('designation').val() === 'Admin' || root.child('employees').child(auth.uid).child('designation').val() === 'Manager')"
+    },
+    "raw_materials": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('employees').child(auth.uid).child('designation').val() === 'Admin' || root.child('employees').child(auth.uid).child('designation').val() === 'Manager')"
+    },
+    "suppliers": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('employees').child(auth.uid).child('designation').val() === 'Admin' || root.child('employees').child(auth.uid).child('designation').val() === 'Manager')"
+    },
+    "expenses": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('employees').child(auth.uid).child('designation').val() === 'Admin' || root.child('employees').child(auth.uid).child('designation').val() === 'Manager')"
+    },
+    "employees": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('employees').child(auth.uid).child('designation').val() === 'Admin' || root.child('employees').child(auth.uid).child('designation').val() === 'Manager')"
+    },
+    "attendance": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "salary_payments": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('employees').child(auth.uid).child('designation').val() === 'Admin'"
+    },
+    "invoices": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".delete": "false"
+    },
+    "stock_logs": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('employees').child(auth.uid).child('designation').val() === 'Admin' || root.child('employees').child(auth.uid).child('designation').val() === 'Manager')"
+    },
+    "metadata": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
