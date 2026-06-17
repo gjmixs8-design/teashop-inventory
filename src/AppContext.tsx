@@ -193,13 +193,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return unsubscribe;
   }, []);
 
-  // Sync auth state to active session when Strict Auth Mode is active
+  // Sync auth state to active session
   useEffect(() => {
-    if (!settings.strictAuthMode) {
-      // Demo / simulation mode leaves the session alone
-      return;
-    }
-
     if (authLoading) return;
 
     if (firebaseUser && firebaseUser.email) {
@@ -224,20 +219,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userId: "guest",
       });
     }
-  }, [firebaseUser, employees, settings.strictAuthMode, authLoading]);
+  }, [firebaseUser, employees, authLoading]);
 
   const setSession = (sess: UserSession) => {
-    // Prevent manual simulation role override when in strict server auth mode
-    if (settings.strictAuthMode) {
-      console.warn("Cannot manually set session when strict server auth mode is enabled.");
-      return;
-    }
-    setSessionState(sess);
-    try {
-      localStorage.setItem("tea_session", JSON.stringify(sess));
-    } catch (e) {
-      console.warn("Session storage write blocked:", e);
-    }
+    console.warn("Manual session override is disabled in production.");
   };
 
   const loginUser = async (email: string, password: string) => {

@@ -157,56 +157,14 @@ function AppContent() {
             <Lock size={28} />
           </div>
           <div>
-            <h3 className="text-lg font-black text-slate-800 uppercase animate-pulse">Access Denied & Locked</h3>
+            <h3 className="text-lg font-black text-slate-800 uppercase animate-pulse">Access Denied</h3>
             <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-              Your active simulated session role is <span className="font-extrabold text-rose-600 bg-rose-100/40 dark:bg-rose-55 dark:text-rose-400 px-2 py-0.5 rounded">{session.role}</span>.
-              This operations panel is locked. Switch roles below or in Settings & Roles.
-            </p>
-          </div>
-
-          {/* Easy Simulator Quick Switch Panel */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/60 text-left space-y-3 shadow-inner">
-            <div className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider text-center flex items-center justify-center gap-1">
-              <span><Zap size={12} className="inline mr-1 text-amber-500 animate-pulse" /> INSTANT SWITCH SIMULATOR ROLE</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { r: "Admin", name: "Ravi Kumar (Owner)", id: "emp-4" },
-                { r: "Manager", name: "Sanjay Gowda (Manager)", id: "emp-3" },
-                { r: "Cashier", name: "Priya Dharshini (Cashier)", id: "emp-2" },
-                { r: "Staff", name: "Arun Kumar (Staff)", id: "emp-1" },
-              ].map(({ r, name, id }) => (
-                <button
-                  key={r}
-                  onClick={() => {
-                    setSession({
-                      role: r as any,
-                      userName: name,
-                      userId: id,
-                    });
-                  }}
-                  className={`py-2 px-3 text-xs font-black rounded-xl border transition-all cursor-pointer ${
-                    session.role === r
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-md scale-[1.02]"
-                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100 dark:bg-[#151a26] dark:text-slate-300 dark:border-slate-800 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-            <p className="text-[9px] text-center text-gray-400 font-semibold leading-normal">
-              Tap any role to immediately override simulated privileges & unlock this view!
+              Your active session role is <span className="font-extrabold text-rose-600 bg-rose-100/40 dark:bg-rose-55 dark:text-rose-400 px-2 py-0.5 rounded">{session.role}</span>.
+              This operations panel is restricted and requires higher privileges.
             </p>
           </div>
 
           <div className="pt-1 flex flex-col gap-2">
-            <button
-              onClick={() => setActiveTab("settings")}
-              className="py-2.5 px-4 bg-indigo-650 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all shadow-xs focus:outline-none cursor-pointer"
-            >
-              Go to Simulator controls
-            </button>
             <button
               onClick={() => setActiveTab("dashboard")}
               className="py-2 text-xs font-extrabold text-slate-500 hover:text-slate-800 focus:outline-none cursor-pointer"
@@ -240,7 +198,7 @@ function AppContent() {
     }
   };
 
-  if (settings.strictAuthMode && authLoading) {
+  if (authLoading) {
     return (
       <div className="h-dvh w-screen flex flex-col items-center justify-center bg-[#0a0c10] text-white">
         <div className="space-y-4 text-center">
@@ -251,7 +209,7 @@ function AppContent() {
     );
   }
 
-  if (settings.strictAuthMode && !firebaseUser) {
+  if (!firebaseUser) {
     return (
       <div className="h-dvh w-screen flex items-center justify-center bg-[#0a0c10] p-4 font-sans selection:bg-emerald-500/30 select-none">
         <div className="w-full max-w-md bg-[#11141e] border border-[#242c3f] rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
@@ -260,7 +218,7 @@ function AppContent() {
               <Coffee size={28} />
             </div>
             <h2 className="text-xl font-display font-black text-slate-100 tracking-tight">Chai Charcha Cafe ERP</h2>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Strict Authentication Panel</p>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Employee Login Panel</p>
           </div>
 
           {loginError && (
@@ -406,18 +364,11 @@ function AppContent() {
             </button>
           </div>
 
-          {/* User Session Role selection pill / Strict auth exit */}
+          {/* User Session Role display pill & sign out button */}
           <div className="flex items-center gap-1.5 shrink-0">
             <div
-              onClick={() => {
-                if (!settings.strictAuthMode) {
-                  setActiveTab("settings");
-                }
-              }}
-              className={`flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-800 rounded-xl select-none font-bold transition-all text-xs ${
-                settings.strictAuthMode ? "cursor-default" : "cursor-pointer"
-              }`}
-              title={settings.strictAuthMode ? "Signed in user profile" : "Click to alternate simulating role"}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-800 rounded-xl select-none font-bold text-xs cursor-default"
+              title="Signed in user profile"
             >
               <span className="truncate max-w-[65px] sm:max-w-[120px]">{session.userName}</span>
               <span className="text-[8px] px-1 bg-indigo-200 rounded font-black uppercase text-indigo-900 shrink-0">
@@ -425,7 +376,7 @@ function AppContent() {
               </span>
             </div>
             
-            {settings.strictAuthMode && firebaseUser && (
+            {firebaseUser && (
               <button
                 onClick={async () => {
                   if (window.confirm("Are you sure you want to sign out and lock the session?")) {

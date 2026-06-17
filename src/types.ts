@@ -161,7 +161,6 @@ export interface ShopSettings {
   taxEnabled: boolean;
   currency: string; // e.g. "₹", "$", "€"
   thermalWidth: "58mm" | "80mm";
-  strictAuthMode?: boolean;
 }
 
 export type AppRole = "Admin" | "Manager" | "Cashier" | "Staff";

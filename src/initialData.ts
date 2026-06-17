@@ -791,6 +791,5 @@ export const defaultShopSettings: ShopSettings = {
   taxRateDefault: 5, // 5% GST on food service default
   taxEnabled: true,
   currency: "₹",
-  thermalWidth: "80mm",
-  strictAuthMode: false
+  thermalWidth: "80mm"
 };
